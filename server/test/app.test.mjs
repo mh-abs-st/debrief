@@ -147,3 +147,35 @@ test('helpers: parse JSON out of surrounding text and reject junk', () => {
   assert.deepEqual(cleanSkills(null), []);
   assert.deepEqual(cleanFollowups({ questions: ['not a question'] }), []);
 });
+
+test('transcribe token: hands out a short-lived key, behind the app token', async () => {
+  const calls = [];
+  const grantKey = async (opts) => {
+    calls.push(opts);
+    return { key: 'temp-key', expiresIn: 60 };
+  };
+  const server = createApp({ complete: async () => '', grantKey, appToken: TOKEN, models });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const refused = await fetch(`${base}/api/transcribe-token`, { method: 'POST' });
+    assert.equal(refused.status, 401);
+    assert.equal(calls.length, 0);
+
+    const res = await post(base, '/api/transcribe-token', {});
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { key: 'temp-key', expiresIn: 60 });
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('transcribe token: unavailable when no Deepgram key is configured', async () => {
+  const app = await start();
+  try {
+    const res = await post(app.base, '/api/transcribe-token', {});
+    assert.equal(res.status, 503);
+  } finally {
+    await app.close();
+  }
+});

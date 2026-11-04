@@ -38,7 +38,7 @@ const text = (value, max) => (typeof value === 'string' ? value.trim().slice(0, 
 
 // createApp({ complete, appToken, models }) → http.Server
 // complete({model, system, user, maxTokens}) → reply text. Injected so tests can fake the AI.
-export function createApp({ complete, appToken = '', models }) {
+export function createApp({ complete, grantKey, appToken = '', models }) {
   return http.createServer(async (req, res) => {
     const origin = req.headers.origin;
     const url = new URL(req.url, 'http://localhost');
@@ -74,6 +74,12 @@ export function createApp({ complete, appToken = '', models }) {
         if (!skill || !answer) return send(res, 400, { error: 'missing_fields', message: 'Add the skill and the answer first.' }, origin);
         const reply = await complete({ model: models.fast, system: FOLLOWUP_SYSTEM, user: followupUser({ skill, question, answer }), maxTokens: 300 });
         return send(res, 200, { questions: cleanFollowups(parseJsonObject(reply)) }, origin);
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/transcribe-token') {
+        if (!grantKey) return send(res, 503, { error: 'not_configured', message: MESSAGES.unavailable }, origin);
+        const { key, expiresIn } = await grantKey();
+        return send(res, 200, { key, expiresIn }, origin);
       }
 
       return send(res, 404, { error: 'not_found' }, origin);

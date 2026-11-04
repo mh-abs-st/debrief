@@ -96,3 +96,38 @@ label {
 #suggestions li {
   margin-bottom: 6px;
 }
+
+.consent {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 8px 0;
+}
+
+.consent input {
+  width: auto;
+  margin-top: 3px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 6px 0;
+}
+
+.transcript {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 14px;
+  white-space: pre-wrap;
+  margin-bottom: 8px;
+}
+
+.transcript .interim {
+  color: #777;
+  font-style: italic;
+}
