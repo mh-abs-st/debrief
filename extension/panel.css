@@ -7,10 +7,71 @@ body {
 
 h1 {
   font-size: 18px;
-  margin: 0 0 8px;
+  margin: 0 0 12px;
+}
+
+h2 {
+  font-size: 15px;
+  margin: 16px 0 6px;
 }
 
 .muted {
   color: #666;
   font-size: 14px;
+  margin: 0 0 8px;
+}
+
+textarea,
+input {
+  box-sizing: border-box;
+  width: 100%;
+  font: inherit;
+  padding: 8px;
+  margin: 4px 0 8px;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+}
+
+button {
+  font: inherit;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 6px;
+  background: #1a1a1a;
+  color: #fff;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+label {
+  display: block;
+  font-size: 14px;
+}
+
+#skills {
+  padding-left: 18px;
+  margin: 0;
+}
+
+#skills li {
+  margin-bottom: 8px;
+}
+
+#skills .why {
+  display: block;
+  color: #666;
+  font-size: 13px;
+}
+
+#status {
+  font-size: 14px;
+  min-height: 1em;
+}
+
+#status.error {
+  color: #a11a1a;
 }

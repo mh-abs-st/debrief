@@ -2,7 +2,7 @@
 
 A Chrome side-panel assistant for interviewers. It helps the person running an interview with follow-up questions, skill coverage, and structured notes. It supports the interviewer's judgement and never makes the decision.
 
-**Status:** early MVP scaffolding. Not yet usable.
+**Status:** early MVP. Job setup works end to end. The live transcript and notes are next.
 
 ## Principles
 
@@ -13,21 +13,39 @@ A Chrome side-panel assistant for interviewers. It helps the person running an i
 
 ## Structure
 
-- `extension/`: Chrome Extension (Manifest V3) with side panel and content script
-- `server/`: Node.js backend (API, auth, billing hooks, to be added)
-- `docs/`: scope, compliance notes, decisions
+- `extension/`: Chrome extension (Manifest V3), side panel. Plain JavaScript, no build step.
+- `server/`: Node backend (Node 20+). No npm dependencies: uses the built-in HTTP server and `fetch`.
+  - `lib/app.js`: routes and auth. `lib/prompts.js`: the AI prompts and output checks. `lib/claude.js`: Anthropic API client.
+  - `lib/aierrors.js`: copied from Offro (`backend/aierrors.js`) so errors are friendly and never expose raw provider details.
+- `docs/`: scope, compliance notes, decisions.
 
-## Getting started
+## Run it locally
 
-Requires Node.js 20 or later.
+1. Server:
 
-```bash
-cd server
-npm install
-npm start
-```
+   ```bash
+   cd server
+   cp .env.example .env   # fill in ANTHROPIC_API_KEY and DEBRIEF_APP_TOKEN
+   node --env-file=.env index.js
+   ```
 
-Load the extension: open `chrome://extensions`, enable Developer mode, choose "Load unpacked", and select the `extension/` folder.
+2. Tests (no network or API key needed):
+
+   ```bash
+   cd server && npm test
+   ```
+
+3. Extension: open `chrome://extensions`, turn on Developer mode, choose "Load unpacked", and select the `extension/` folder. In the side panel, open Settings and paste the same `DEBRIEF_APP_TOKEN`.
+
+## API
+
+All `/api` routes need `Authorization: Bearer <DEBRIEF_APP_TOKEN>`. Without a configured token, the API refuses everything.
+
+- `GET /health`: no auth, returns `{ ok: true }`.
+- `POST /api/skills`: body `{ jobDescription }`, returns `{ skills: [{ name, why }] }`.
+- `POST /api/followups`: body `{ skill, question, answer }`, returns `{ questions: [...] }` (at most two).
+
+CORS allows only `chrome-extension://` origins.
 
 ## Compliance
 
