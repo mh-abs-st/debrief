@@ -6,13 +6,14 @@ Interviewers at small companies and agencies who run their own interviews, with 
 
 ## MVP features
 
-1. **Job setup:** paste a job description. The tool turns the required skills into a checklist.
-2. **Live side panel:** transcript from the call tab (Deepgram), with one follow-up question suggestion per candidate answer and a quick-start line.
-3. **Coverage tracker:** shows which required skills have been probed.
-4. **Structured notes:** one box per skill. The interviewer types, and the tool attaches transcript snippets.
-5. **After the call:** a clean notes document (Markdown or export). No score.
-6. **Consent:** a notice to read out at the start. Recording off by default.
-7. **Single-seat plan:** billed monthly.
+1. **Job setup (built):** paste a job description. The tool turns the required skills into a checklist.
+2. **Live transcript (built, untested on a real call):** the call tab's audio goes to Deepgram from the browser. The panel must stay open. Needs the consent box ticked first.
+3. **Coverage tracker (built):** tick each required skill as it's covered; the panel shows a count.
+4. **Structured notes (built):** one notes box per skill, saved in the browser.
+5. **Follow-up suggestions (built, typed answers only):** the interviewer types or pastes an answer and gets up to two follow-up questions. Not yet automatic from the transcript.
+6. **After the call (built):** copy the notes as Markdown. No score.
+7. **Not yet built:** automatic follow-ups from the live transcript, a quick-start line, transcript snippets in notes, a recording indicator, sign-in, and billing.
+8. **Single-seat plan:** billed monthly (later).
 
 ## Next steps
 
