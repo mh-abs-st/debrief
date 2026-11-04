@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Debrief",
+  "version": "0.1.0",
+  "description": "A side-panel assistant that helps interviewers ask better follow-up questions and keep structured notes.",
+  "permissions": ["sidePanel", "storage", "activeTab"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "panel.html"
+  },
+  "action": {
+    "default_title": "Open Debrief"
+  }
+}
