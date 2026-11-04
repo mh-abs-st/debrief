@@ -3,8 +3,12 @@
   "name": "Debrief",
   "version": "0.1.0",
   "description": "A side-panel assistant that helps interviewers ask better follow-up questions and keep structured notes.",
-  "permissions": ["sidePanel", "storage"],
-  "host_permissions": ["http://localhost:8787/*"],
+  "permissions": ["sidePanel", "storage", "tabs", "tabCapture"],
+  "host_permissions": [
+    "http://localhost:8787/*",
+    "https://api.deepgram.com/*",
+    "wss://api.deepgram.com/*"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"

@@ -1,12 +1,15 @@
-// Side panel: job setup, skills checklist, notes, and follow-up suggestions.
-// The server gets only the job description and the answer you choose to send. Notes stay in this browser.
+// Side panel: job setup, skills checklist, live transcript, notes, and follow-up suggestions.
+// The server gets only the job description and the answer you choose to send. Call audio goes straight to
+// the speech service. Notes stay in this browser; the transcript is kept in this panel only.
 import { startInterview, setCovered, setNotes, coverage, toMarkdown } from './notes.js';
+import { startListening } from './capture.js';
 
 const $ = (id) => document.getElementById(id);
 const DEFAULTS = { serverUrl: 'http://localhost:8787', appToken: '' };
 const STORE_KEY = 'interview';
 
 let state = null; // { skills: [{ name, why, covered, notes }] }
+let listening = null; // { stop() } while the call is being transcribed
 
 function setStatus(message, isError = false) {
   $('status').textContent = message;
@@ -22,6 +25,19 @@ async function loadSettings() {
 
 async function save() {
   if (state) await chrome.storage.local.set({ [STORE_KEY]: state });
+}
+
+async function api(path, body) {
+  const { serverUrl, appToken } = await loadSettings();
+  if (!appToken) throw new Error('Add the app token in Settings first.');
+  const res = await fetch(`${serverUrl}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${appToken}` },
+    body: JSON.stringify(body ?? {}),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.message || 'Something went wrong. Please try again.');
+  return data;
 }
 
 $('save-settings').addEventListener('click', async () => {
@@ -78,6 +94,7 @@ function renderInterview() {
   select.replaceChildren(...state.skills.map((s, i) => new Option(s.name, String(i))));
 
   $('interview').hidden = false;
+  $('live').hidden = false;
   $('followups').hidden = false;
   $('export').hidden = false;
   renderCoverage();
@@ -92,58 +109,105 @@ $('make-checklist').addEventListener('click', async () => {
   const jobDescription = $('job-description').value.trim();
   if (!jobDescription) return setStatus('Paste the job description first.', true);
 
-  const { serverUrl, appToken } = await loadSettings();
-  if (!appToken) return setStatus('Add the app token in Settings first.', true);
-
   const button = $('make-checklist');
   button.disabled = true;
   setStatus('Making the checklist…');
   try {
-    const res = await fetch(`${serverUrl}/api/skills`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${appToken}` },
-      body: JSON.stringify({ jobDescription }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return setStatus(data.message || 'Something went wrong. Please try again.', true);
+    const data = await api('/api/skills', { jobDescription });
     if (!data.skills?.length) return setStatus('No skills found. Try a fuller job description.', true);
-
     state = startInterview(data.skills);
     await save();
     renderInterview();
     setStatus('Checklist ready.');
-  } catch {
-    setStatus('We couldn’t reach the server. Check the address in Settings.', true);
+  } catch (err) {
+    setStatus(err.message || 'We couldn’t reach the server. Check the address in Settings.', true);
   } finally {
     button.disabled = false;
   }
 });
+
+// ---- Live transcript ----
+
+// The consent box must be ticked before listening can start.
+$('consent').addEventListener('change', () => {
+  $('start-listening').disabled = !$('consent').checked || Boolean(listening);
+});
+
+function renderTranscript(transcript) {
+  const box = $('transcript');
+  box.replaceChildren();
+  for (const line of transcript.lines) {
+    const p = document.createElement('p');
+    p.textContent = line.text;
+    box.append(p);
+  }
+  if (transcript.interim) {
+    const p = document.createElement('p');
+    p.className = 'interim';
+    p.textContent = transcript.interim;
+    box.append(p);
+  }
+  box.scrollTop = box.scrollHeight;
+}
+
+function setListeningUi(isListening) {
+  $('start-listening').hidden = isListening;
+  $('stop-listening').hidden = !isListening;
+  $('start-listening').disabled = isListening || !$('consent').checked;
+}
+
+$('start-listening').addEventListener('click', async () => {
+  if (!$('consent').checked) return setStatus('Confirm the candidate knows the call is being transcribed first.', true);
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) return setStatus('Open the call in this browser window first.', true);
+
+  setStatus('Starting…');
+  try {
+    listening = await startListening({
+      tabId: tab.id,
+      getKey: () => api('/api/transcribe-token'),
+      onTranscript: renderTranscript,
+      onStatus: (text, isError) => {
+        setStatus(text, isError);
+        if (isError && listening) {
+          listening = null;
+          setListeningUi(false);
+        }
+      },
+    });
+    setListeningUi(true);
+  } catch (err) {
+    setStatus(err.message || 'We couldn’t start listening. Please try again.', true);
+  }
+});
+
+$('stop-listening').addEventListener('click', () => {
+  if (!listening) return;
+  listening.stop();
+  listening = null;
+  setListeningUi(false);
+});
+
+// ---- Follow-up suggestions ----
 
 $('suggest').addEventListener('click', async () => {
   const index = Number($('followup-skill').value);
   const answer = $('followup-answer').value.trim();
   if (!answer) return setStatus('Type or paste the candidate’s answer first.', true);
 
-  const { serverUrl, appToken } = await loadSettings();
   const button = $('suggest');
   button.disabled = true;
   setStatus('Thinking of follow-ups…');
   try {
-    const res = await fetch(`${serverUrl}/api/followups`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${appToken}` },
-      body: JSON.stringify({
-        skill: state.skills[index].name,
-        question: $('followup-question').value.trim(),
-        answer,
-      }),
+    const data = await api('/api/followups', {
+      skill: state.skills[index].name,
+      question: $('followup-question').value.trim(),
+      answer,
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) return setStatus(data.message || 'Something went wrong. Please try again.', true);
     renderSuggestions(data.questions || []);
     setStatus(data.questions?.length ? '' : 'No follow-ups to suggest for this answer.');
-  } catch {
-    setStatus('We couldn’t reach the server. Check the address in Settings.', true);
+  } catch (err) {
+    setStatus(err.message || 'We couldn’t reach the server. Check the address in Settings.', true);
   } finally {
     button.disabled = false;
   }

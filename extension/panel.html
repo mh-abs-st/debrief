@@ -23,6 +23,20 @@
         <ol id="skills"></ol>
       </section>
 
+      <section id="live" hidden>
+        <h2>Live transcript</h2>
+        <label class="consent">
+          <input id="consent" type="checkbox" />
+          The candidate knows this call is being transcribed and agreed to it.
+        </label>
+        <div class="row">
+          <button id="start-listening" type="button" disabled>Start listening</button>
+          <button id="stop-listening" type="button" hidden>Stop listening</button>
+        </div>
+        <p class="muted">Keep this panel open during the call. Open the call in this browser tab, then press Start listening.</p>
+        <div id="transcript" class="transcript" aria-live="polite"></div>
+      </section>
+
       <section id="followups" hidden>
         <h2>Follow-up questions</h2>
         <p class="muted">Type or paste the candidate's answer. Suggestions are only prompts for you to ask. Nothing is scored.</p>
