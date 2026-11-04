@@ -1,8 +1,21 @@
 import http from 'node:http';
+import { timingSafeEqual } from 'node:crypto';
 import { SKILLS_SYSTEM, FOLLOWUP_SYSTEM, parseJsonObject, cleanSkills, cleanFollowups, skillsUser, followupUser } from './prompts.js';
+import { PLAN_SYSTEM, planUser, cleanPlan } from './plan.js';
+import { RESUME_SYSTEM, MAX_PDF_BYTES, base64Bytes, resumeContent, resumeErrorMessage } from './resume.js';
 import { friendlyAiError, userMessage, MESSAGES } from './aierrors.js';
 
-export const LIMITS = { jobDescription: 20_000, answer: 8_000, skill: 200, question: 500, bodyBytes: 64 * 1024 };
+export const LIMITS = {
+  jobDescription: 20_000,
+  answer: 8_000,
+  skill: 200,
+  question: 500,
+  title: 120,
+  resume: 30_000,
+  bodyBytes: 128 * 1024,
+  // Base64 makes a file about 4/3 bigger, plus the JSON around it.
+  resumeBodyBytes: Math.ceil((MAX_PDF_BYTES * 4) / 3) + 4096,
+};
 
 // Only the Debrief extension may call the API from a browser (any other site is refused).
 function corsHeaders(origin) {
@@ -19,26 +32,45 @@ function send(res, status, body, origin) {
   res.end(JSON.stringify(body));
 }
 
-async function readJson(req) {
+// Errors about the request itself (not the AI): `local` keeps them apart from provider errors with the same status.
+const requestError = (status, message) => Object.assign(new Error(message), { status, local: true });
+
+async function readJson(req, maxBytes = LIMITS.bodyBytes) {
   let size = 0;
   const chunks = [];
   for await (const chunk of req) {
     size += chunk.length;
-    if (size > LIMITS.bodyBytes) throw Object.assign(new Error('too large'), { status: 413 });
+    if (size > maxBytes) throw requestError(413, 'That is too large to send.');
     chunks.push(chunk);
   }
   try {
     return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
   } catch {
-    throw Object.assign(new Error('bad json'), { status: 400 });
+    throw requestError(400, MESSAGES.request);
   }
 }
 
 const text = (value, max) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 
-// createApp({ complete, appToken, models }) → http.Server
-// complete({model, system, user, maxTokens}) → reply text. Injected so tests can fake the AI.
+function tokenMatches(header, appToken) {
+  const given = Buffer.from(String(header || ''));
+  const wanted = Buffer.from(`Bearer ${appToken}`);
+  return given.length === wanted.length && timingSafeEqual(given, wanted);
+}
+
+function skillsFrom(value) {
+  return (Array.isArray(value) ? value : [])
+    .map((s) => ({ name: text(s?.name, 80), why: text(s?.why, 200) }))
+    .filter((s) => s.name)
+    .slice(0, 12);
+}
+
+// createApp({ complete, grantKey, appToken, models }) → http.Server
+// complete({model, system, user, maxTokens}) → reply text. grantKey() → { key, expiresIn }. Both injected so
+// tests can fake the AI and Deepgram. models = { fast, assist }.
 export function createApp({ complete, grantKey, appToken = '', models }) {
+  const assist = models.assist || models.fast;
+
   return http.createServer(async (req, res) => {
     const origin = req.headers.origin;
     const url = new URL(req.url, 'http://localhost');
@@ -53,8 +85,8 @@ export function createApp({ complete, grantKey, appToken = '', models }) {
 
     // Everything below needs the app token. Without one configured, the API stays closed.
     if (!appToken) return send(res, 503, { error: 'not_configured', message: MESSAGES.unavailable }, origin);
-    if (req.headers.authorization !== `Bearer ${appToken}`) {
-      return send(res, 401, { error: 'unauthorized', message: 'Please sign in again.' }, origin);
+    if (!tokenMatches(req.headers.authorization, appToken)) {
+      return send(res, 401, { error: 'unauthorized', message: 'The app token is wrong. Check it in Settings.' }, origin);
     }
 
     try {
@@ -76,16 +108,51 @@ export function createApp({ complete, grantKey, appToken = '', models }) {
         return send(res, 200, { questions: cleanFollowups(parseJsonObject(reply)) }, origin);
       }
 
+      if (req.method === 'POST' && url.pathname === '/api/plan') {
+        const body = await readJson(req);
+        const skills = skillsFrom(body.skills);
+        const resumeText = text(body.resumeText, LIMITS.resume);
+        if (!skills.length) return send(res, 400, { error: 'missing_skills', message: 'Add the job’s skills first (Jobs → the job → Make checklist).' }, origin);
+        if (!resumeText) return send(res, 400, { error: 'missing_resume', message: 'Add the candidate’s resume first.' }, origin);
+        const user = planUser({
+          title: text(body.title, LIMITS.title) || 'Untitled job',
+          company: text(body.company, LIMITS.title),
+          description: text(body.description, LIMITS.jobDescription),
+          skills,
+          resumeText,
+        });
+        const reply = await complete({ model: assist, system: PLAN_SYSTEM, user, maxTokens: 2500 });
+        const parsed = parseJsonObject(reply);
+        if (!parsed) return send(res, 502, { error: 'ai_error', message: 'We couldn’t make the plan just now. Please try again.' }, origin);
+        return send(res, 200, { plan: cleanPlan(parsed, skills) }, origin);
+      }
+
+      if (req.method === 'POST' && url.pathname === '/api/resume/parse') {
+        const body = await readJson(req, LIMITS.resumeBodyBytes);
+        const pdfBase64 = typeof body.pdfBase64 === 'string' ? body.pdfBase64 : '';
+        if (!pdfBase64) return send(res, 400, { error: 'missing_file', message: 'We didn’t receive a file. Please choose the PDF again.' }, origin);
+        if (base64Bytes(pdfBase64) > MAX_PDF_BYTES) return send(res, 413, { error: 'too_large', message: 'That PDF is over 8 MB. Try a smaller file, or paste the resume text instead.' }, origin);
+        let reply;
+        try {
+          reply = await complete({ model: models.fast, system: RESUME_SYSTEM, user: resumeContent(pdfBase64), maxTokens: 6000 });
+        } catch (err) {
+          console.error('[resume] could not read PDF:', err?.status || '', err?.message || err);
+          return send(res, 502, { error: 'resume_unreadable', message: resumeErrorMessage(err) }, origin);
+        }
+        const resumeText = reply.trim();
+        if (!resumeText) return send(res, 422, { error: 'resume_empty', message: 'We couldn’t find any text in that PDF. If it’s a scanned image, paste the resume text instead.' }, origin);
+        return send(res, 200, { text: resumeText.slice(0, LIMITS.resume) }, origin);
+      }
+
       if (req.method === 'POST' && url.pathname === '/api/transcribe-token') {
-        if (!grantKey) return send(res, 503, { error: 'not_configured', message: MESSAGES.unavailable }, origin);
+        if (!grantKey) return send(res, 503, { error: 'not_configured', message: 'Live transcription isn’t set up on the server yet.' }, origin);
         const { key, expiresIn } = await grantKey();
         return send(res, 200, { key, expiresIn }, origin);
       }
 
       return send(res, 404, { error: 'not_found' }, origin);
     } catch (err) {
-      if (err?.status === 413) return send(res, 413, { error: 'too_large', message: 'That text is too long.' }, origin);
-      if (err?.status === 400) return send(res, 400, { error: 'bad_request', message: MESSAGES.request }, origin);
+      if (err?.local) return send(res, err.status, { error: err.status === 413 ? 'too_large' : 'bad_request', message: err.message }, origin);
       const message = userMessage(friendlyAiError(err), MESSAGES.generic);
       return send(res, 502, { error: 'ai_error', message }, origin);
     }
