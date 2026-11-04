@@ -17,9 +17,31 @@
         <button id="make-checklist" type="button">Make checklist</button>
       </section>
 
-      <section id="checklist" hidden>
-        <h2>Skills to cover</h2>
-        <ul id="skills"></ul>
+      <section id="interview" hidden>
+        <h2>2. Skills to cover</h2>
+        <p id="coverage" class="muted" aria-live="polite"></p>
+        <ol id="skills"></ol>
+      </section>
+
+      <section id="followups" hidden>
+        <h2>Follow-up questions</h2>
+        <p class="muted">Type or paste the candidate's answer. Suggestions are only prompts for you to ask. Nothing is scored.</p>
+        <label>Skill
+          <select id="followup-skill"></select>
+        </label>
+        <label>Question you asked
+          <input id="followup-question" type="text" />
+        </label>
+        <label>Candidate's answer
+          <textarea id="followup-answer" rows="4"></textarea>
+        </label>
+        <button id="suggest" type="button">Suggest follow-ups</button>
+        <ul id="suggestions"></ul>
+      </section>
+
+      <section id="export" hidden>
+        <h2>3. Finish</h2>
+        <button id="copy-notes" type="button">Copy notes</button>
       </section>
 
       <section id="settings">

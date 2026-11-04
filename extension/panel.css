@@ -75,3 +75,24 @@ label {
 #status.error {
   color: #a11a1a;
 }
+
+#skills li > label {
+  font-weight: 600;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+#skills textarea {
+  margin-top: 6px;
+  font-size: 14px;
+}
+
+#suggestions {
+  padding-left: 18px;
+  margin: 8px 0 0;
+}
+
+#suggestions li {
+  margin-bottom: 6px;
+}

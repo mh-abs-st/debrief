@@ -1,8 +1,12 @@
-// Side panel: job setup (paste a job description, get a skills checklist).
-// Talks to the Debrief server. No candidate data is stored on the server.
+// Side panel: job setup, skills checklist, notes, and follow-up suggestions.
+// The server gets only the job description and the answer you choose to send. Notes stay in this browser.
+import { startInterview, setCovered, setNotes, coverage, toMarkdown } from './notes.js';
 
 const $ = (id) => document.getElementById(id);
 const DEFAULTS = { serverUrl: 'http://localhost:8787', appToken: '' };
+const STORE_KEY = 'interview';
+
+let state = null; // { skills: [{ name, why, covered, notes }] }
 
 function setStatus(message, isError = false) {
   $('status').textContent = message;
@@ -16,6 +20,10 @@ async function loadSettings() {
   return saved;
 }
 
+async function save() {
+  if (state) await chrome.storage.local.set({ [STORE_KEY]: state });
+}
+
 $('save-settings').addEventListener('click', async () => {
   await chrome.storage.local.set({
     serverUrl: $('server-url').value.trim().replace(/\/+$/, ''),
@@ -24,22 +32,60 @@ $('save-settings').addEventListener('click', async () => {
   setStatus('Settings saved.');
 });
 
-// Draws the checklist with textContent only (no innerHTML).
-function renderSkills(skills) {
+// Builds the checklist with DOM calls and textContent only (no innerHTML).
+function renderInterview() {
   const list = $('skills');
   list.replaceChildren();
-  for (const skill of skills) {
+  state.skills.forEach((skill, index) => {
     const item = document.createElement('li');
-    item.textContent = skill.name;
+
+    const label = document.createElement('label');
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = skill.covered;
+    box.addEventListener('change', async () => {
+      state = setCovered(state, index, box.checked);
+      await save();
+      renderCoverage();
+    });
+    label.append(box, ` ${skill.name}`);
+    item.append(label);
+
     if (skill.why) {
       const why = document.createElement('span');
       why.className = 'why';
       why.textContent = skill.why;
       item.append(why);
     }
+
+    const notes = document.createElement('textarea');
+    notes.rows = 2;
+    notes.placeholder = 'Your notes';
+    notes.value = skill.notes;
+    notes.setAttribute('aria-label', `Notes for ${skill.name}`);
+    let timer = null;
+    notes.addEventListener('input', () => {
+      state = setNotes(state, index, notes.value);
+      clearTimeout(timer);
+      timer = setTimeout(save, 400); // save while typing, without writing on every key
+    });
+    item.append(notes);
+
     list.append(item);
-  }
-  $('checklist').hidden = skills.length === 0;
+  });
+
+  const select = $('followup-skill');
+  select.replaceChildren(...state.skills.map((s, i) => new Option(s.name, String(i))));
+
+  $('interview').hidden = false;
+  $('followups').hidden = false;
+  $('export').hidden = false;
+  renderCoverage();
+}
+
+function renderCoverage() {
+  const { covered, total } = coverage(state);
+  $('coverage').textContent = `${covered} of ${total} skills covered`;
 }
 
 $('make-checklist').addEventListener('click', async () => {
@@ -60,8 +106,12 @@ $('make-checklist').addEventListener('click', async () => {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return setStatus(data.message || 'Something went wrong. Please try again.', true);
-    renderSkills(data.skills || []);
-    setStatus(data.skills?.length ? 'Checklist ready.' : 'No skills found. Try a fuller job description.', !data.skills?.length);
+    if (!data.skills?.length) return setStatus('No skills found. Try a fuller job description.', true);
+
+    state = startInterview(data.skills);
+    await save();
+    renderInterview();
+    setStatus('Checklist ready.');
   } catch {
     setStatus('We couldn’t reach the server. Check the address in Settings.', true);
   } finally {
@@ -69,4 +119,65 @@ $('make-checklist').addEventListener('click', async () => {
   }
 });
 
-loadSettings();
+$('suggest').addEventListener('click', async () => {
+  const index = Number($('followup-skill').value);
+  const answer = $('followup-answer').value.trim();
+  if (!answer) return setStatus('Type or paste the candidate’s answer first.', true);
+
+  const { serverUrl, appToken } = await loadSettings();
+  const button = $('suggest');
+  button.disabled = true;
+  setStatus('Thinking of follow-ups…');
+  try {
+    const res = await fetch(`${serverUrl}/api/followups`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${appToken}` },
+      body: JSON.stringify({
+        skill: state.skills[index].name,
+        question: $('followup-question').value.trim(),
+        answer,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return setStatus(data.message || 'Something went wrong. Please try again.', true);
+    renderSuggestions(data.questions || []);
+    setStatus(data.questions?.length ? '' : 'No follow-ups to suggest for this answer.');
+  } catch {
+    setStatus('We couldn’t reach the server. Check the address in Settings.', true);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+// Each suggestion is a plain line the interviewer can read aloud or copy. Nothing is sent back to the server.
+function renderSuggestions(questions) {
+  const list = $('suggestions');
+  list.replaceChildren();
+  for (const q of questions) {
+    const item = document.createElement('li');
+    item.textContent = q;
+    list.append(item);
+  }
+}
+
+$('copy-notes').addEventListener('click', async () => {
+  if (!state) return;
+  const text = toMarkdown(state, { date: new Date().toISOString().slice(0, 10) });
+  try {
+    await navigator.clipboard.writeText(text);
+    setStatus('Notes copied.');
+  } catch {
+    setStatus('Could not copy. Select the notes and copy them by hand.', true);
+  }
+});
+
+async function restore() {
+  await loadSettings();
+  const saved = await chrome.storage.local.get({ [STORE_KEY]: null });
+  if (saved[STORE_KEY]?.skills?.length) {
+    state = saved[STORE_KEY];
+    renderInterview();
+  }
+}
+
+restore();

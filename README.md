@@ -2,7 +2,7 @@
 
 A Chrome side-panel assistant for interviewers. It helps the person running an interview with follow-up questions, skill coverage, and structured notes. It supports the interviewer's judgement and never makes the decision.
 
-**Status:** early MVP. Job setup works end to end. The live transcript and notes are next.
+**Status:** early MVP. Job setup, skills checklist, per-skill notes and follow-up suggestions work when you type the answer. Live transcript capture is next.
 
 ## Principles
 
@@ -17,6 +17,7 @@ A Chrome side-panel assistant for interviewers. It helps the person running an i
 - `server/`: Node backend (Node 20+). No npm dependencies: uses the built-in HTTP server and `fetch`.
   - `lib/app.js`: routes and auth. `lib/prompts.js`: the AI prompts and output checks. `lib/claude.js`: Anthropic API client.
   - `lib/aierrors.js`: copied from Offro (`backend/aierrors.js`) so errors are friendly and never expose raw provider details.
+- `extension/notes.js`: pure checklist and notes logic (tested). Notes stay in the browser.
 - `docs/`: scope, compliance notes, decisions.
 
 ## Run it locally
@@ -35,7 +36,13 @@ A Chrome side-panel assistant for interviewers. It helps the person running an i
    cd server && npm test
    ```
 
-3. Extension: open `chrome://extensions`, turn on Developer mode, choose "Load unpacked", and select the `extension/` folder. In the side panel, open Settings and paste the same `DEBRIEF_APP_TOKEN`.
+3. Extension logic tests (no Chrome needed):
+
+   ```bash
+   cd extension && npm test
+   ```
+
+4. Extension: open `chrome://extensions`, turn on Developer mode, choose "Load unpacked", and select the `extension/` folder. In the side panel, open Settings and paste the same `DEBRIEF_APP_TOKEN`.
 
 ## API
 
