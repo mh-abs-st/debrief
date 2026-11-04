@@ -4,49 +4,41 @@
 
 Interviewers at small companies and agencies who run their own interviews, with one seat per person. Team and ATS features come later.
 
-## MVP features
+## Built
 
-1. **Job setup (built):** paste a job description. The tool turns the required skills into a checklist.
-2. **Live transcript (built, untested on a real call):** the call tab's audio goes to Deepgram from the browser. The panel must stay open. Needs the consent box ticked first.
-3. **Coverage tracker (built):** tick each required skill as it's covered; the panel shows a count.
-4. **Structured notes (built):** one notes box per skill, saved in the browser.
-5. **Follow-up suggestions (built, typed answers only):** the interviewer types or pastes an answer and gets up to two follow-up questions. Not yet automatic from the transcript.
-6. **After the call (built):** copy the notes as Markdown. No score.
-7. **Not yet built:** automatic follow-ups from the live transcript, a quick-start line, transcript snippets in notes, a recording indicator, sign-in, and billing.
-8. **Single-seat plan:** billed monthly (later).
+1. **Jobs:** several jobs, open or closed, each with a skills checklist made from the description (editable).
+2. **Candidates per job:** name, email, profile link (stored, never read), interview date, resume (PDF or pasted), stage.
+3. **Prepare:** an interview plan per candidate from their resume: evidence per skill, what to find out, questions, claims to check. No score.
+4. **Live:** start an interview for a candidate, consent box before listening, live transcript (call tab audio → Deepgram from the browser), skills checklist with notes, follow-ups from the transcript or a typed answer, planned questions, end and save, copy notes as Markdown.
+5. **Demo:** scripted interview with made-up people; no AI or saved data.
+6. **Settings:** server and token, call language, theme, data retention, delete everything.
+
+Checked in a browser with a fake server and fake Chrome APIs; not yet on a real call.
 
 ## Next steps
 
-1. Load the extension in Chrome and test the flow with a real call (Google Meet is the first target). Check that tab capture works in the side panel and that the transcript appears.
-2. Check the Deepgram temporary-key flow (`/v1/auth/grant`) against Deepgram's current docs, since it was written without testing against the live API.
-3. Add a visible recording indicator and a way to stop listening if the call ends.
-4. Add sign-in and billing (currently one shared app token).
-5. Get a Deepgram data processing agreement and an Anthropic one before taking real candidate data.
-6. Write the candidate notice text and get it reviewed.
+1. Load the extension in Chrome and run one real call (Google Meet first). Check tab capture from the side panel and that the transcript appears.
+2. Check the Deepgram temporary-key flow (`/v1/auth/grant`) and the browser login against Deepgram's current docs, since neither has been tried with a live key.
+3. Try `/api/plan` and `/api/resume/parse` with real resumes and tune the prompts.
+4. Add a visible recording indicator, and stop listening when the call tab closes.
+5. Sign-in and billing (now one shared app token); reuse Offro's Supabase and Stripe code.
+6. Get data processing agreements with Deepgram and Anthropic, write the candidate notice, and get both reviewed before real candidate data.
 
 ## Out of scope for MVP
 
-- AI scores, rankings, or recommendations about candidates
-- Tone, emotion, or personality analysis
-- Candidate profiling from any source
+- AI scores, rankings, fit labels or hire/reject recommendations
+- Tone, emotion or personality analysis
+- Reading or scraping profile pages
 - ATS integrations
-- Long-term audio storage
-- Saving transcripts anywhere other than the interviewer's browser
-
-The "fair scorecard" is the risky part. In v1 the interviewer enters the ratings. The tool only organises the evidence.
+- Storing audio, or storing transcripts anywhere but the interviewer's browser
 
 ## Compliance checklist (EU)
 
-- **AI Act:** AI that evaluates candidates is high-risk. Confirm current obligations and deadlines with a lawyer before selling any candidate-evaluation feature. Emotion recognition in the workplace is prohibited.
-- **GDPR:** define the legal basis, candidate notice, a DPIA, retention limits, and processor agreements (Deepgram, Anthropic, Supabase, Stripe). Current data flow: call audio goes browser → Deepgram directly; job descriptions and the answers you send for follow-up suggestions go to our server and then Anthropic; notes and transcripts stay in the browser.
+- **AI Act:** AI that evaluates candidates is high-risk, and emotion recognition at work is prohibited. Debrief organises evidence and questions only. Confirm with a lawyer that the interview plan stays outside "evaluation" before selling.
+- **GDPR:** legal basis, candidate notice, a DPIA, retention limits (Settings: 90 days by default), and processor agreements (Deepgram, Anthropic, later Supabase and Stripe). Data flow: call audio goes browser → Deepgram; job descriptions, resumes (for plans and PDF reading) and answers sent for follow-ups go to our server and then Anthropic, without being stored; jobs, candidates, plans and notes stay in the browser.
 - **ePrivacy:** check consent rules for capturing call audio.
 - **VAT:** plan for EU VAT on digital services.
 
 ## Validation before building further
 
 Talk to 8 to 10 small-company founders or agency leads who run interviews. Ask whether they would pay monthly, and what their current notes look like. If they would not pay for notes and coverage, stop.
-
-## Reuse from Offro
-
-- Reuse: audio capture, Deepgram, Claude streaming, side panel, on-screen card, Supabase, Stripe
-- Drop: consumer credits, prep packs, translation, explain-a-term

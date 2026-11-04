@@ -1,247 +1,79 @@
-// Side panel: job setup, skills checklist, live transcript, notes, and follow-up suggestions.
-// The server gets only the job description and the answer you choose to send. Call audio goes straight to
-// the speech service. Notes stay in this browser; the transcript is kept in this panel only.
-import { startInterview, setCovered, setNotes, coverage, toMarkdown } from './notes.js';
-import { startListening } from './capture.js';
+// Side panel entry: loads saved data, wires the four tabs (Live, Prepare, Jobs, Demo) and Settings.
+import { $, toast } from './ui.js';
+import { load, getSettings } from './data.js';
+import { initJobs, showJob, addJob, addCandidateTo } from './jobs-view.js';
+import { initPrepare, selectForPrepare } from './prepare-view.js';
+import { initLive, selectForLive, isListening } from './live-view.js';
+import { initDemo, stopDemo } from './demo-view.js';
+import { initSettings, applyTheme } from './settings-view.js';
 
-const $ = (id) => document.getElementById(id);
-const DEFAULTS = { serverUrl: 'http://localhost:8787', appToken: '' };
-const STORE_KEY = 'interview';
+const TABS = ['live', 'prepare', 'jobs', 'demo'];
 
-let state = null; // { skills: [{ name, why, covered, notes }] }
-let listening = null; // { stop() } while the call is being transcribed
-
-function setStatus(message, isError = false) {
-  $('status').textContent = message;
-  $('status').classList.toggle('error', isError);
+function showTab(name) {
+  for (const t of TABS) {
+    $(`tab-${t}`).setAttribute('aria-selected', String(t === name));
+    $(`view-${t}`).hidden = t !== name;
+  }
+  if (name !== 'demo') stopDemo();
+  try {
+    localStorage.setItem('debriefTab', name);
+  } catch {}
 }
 
-async function loadSettings() {
-  const saved = await chrome.storage.local.get(DEFAULTS);
-  $('server-url').value = saved.serverUrl;
-  $('app-token').value = saved.appToken;
-  return saved;
+// Moves between tabs with a job or candidate already chosen (e.g. Jobs → "Prepare" on a candidate).
+function goTo(tab, { jobId, candidateId, addCandidate } = {}) {
+  if (tab === 'jobs') {
+    if (jobId) showJob(jobId);
+    else showJob(null);
+    showTab('jobs');
+    if (jobId && addCandidate) addCandidateTo(jobId);
+    else if (!jobId) addJob();
+    return;
+  }
+  if (tab === 'prepare') selectForPrepare(jobId, candidateId);
+  if (tab === 'live') selectForLive(jobId, candidateId);
+  showTab(tab);
 }
 
-async function save() {
-  if (state) await chrome.storage.local.set({ [STORE_KEY]: state });
-}
+async function main() {
+  const { removed } = await load();
+  applyTheme(getSettings().theme);
 
-async function api(path, body) {
-  const { serverUrl, appToken } = await loadSettings();
-  if (!appToken) throw new Error('Add the app token in Settings first.');
-  const res = await fetch(`${serverUrl}${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${appToken}` },
-    body: JSON.stringify(body ?? {}),
+  initSettings();
+  initJobs({ onGo: goTo });
+  initPrepare({ onGo: goTo });
+  initLive({ onGo: goTo });
+  initDemo();
+
+  $('tabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('[role="tab"]');
+    if (btn) showTab(btn.dataset.tab);
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.message || 'Something went wrong. Please try again.');
-  return data;
-}
-
-$('save-settings').addEventListener('click', async () => {
-  await chrome.storage.local.set({
-    serverUrl: $('server-url').value.trim().replace(/\/+$/, ''),
-    appToken: $('app-token').value.trim(),
-  });
-  setStatus('Settings saved.');
-});
-
-// Builds the checklist with DOM calls and textContent only (no innerHTML).
-function renderInterview() {
-  const list = $('skills');
-  list.replaceChildren();
-  state.skills.forEach((skill, index) => {
-    const item = document.createElement('li');
-
-    const label = document.createElement('label');
-    const box = document.createElement('input');
-    box.type = 'checkbox';
-    box.checked = skill.covered;
-    box.addEventListener('change', async () => {
-      state = setCovered(state, index, box.checked);
-      await save();
-      renderCoverage();
-    });
-    label.append(box, ` ${skill.name}`);
-    item.append(label);
-
-    if (skill.why) {
-      const why = document.createElement('span');
-      why.className = 'why';
-      why.textContent = skill.why;
-      item.append(why);
-    }
-
-    const notes = document.createElement('textarea');
-    notes.rows = 2;
-    notes.placeholder = 'Your notes';
-    notes.value = skill.notes;
-    notes.setAttribute('aria-label', `Notes for ${skill.name}`);
-    let timer = null;
-    notes.addEventListener('input', () => {
-      state = setNotes(state, index, notes.value);
-      clearTimeout(timer);
-      timer = setTimeout(save, 400); // save while typing, without writing on every key
-    });
-    item.append(notes);
-
-    list.append(item);
+  // Arrow keys move between tabs, as for any tab list.
+  $('tabs').addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const i = TABS.findIndex((t) => $(`tab-${t}`).getAttribute('aria-selected') === 'true');
+    const next = TABS[(i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length];
+    showTab(next);
+    $(`tab-${next}`).focus();
   });
 
-  const select = $('followup-skill');
-  select.replaceChildren(...state.skills.map((s, i) => new Option(s.name, String(i))));
-
-  $('interview').hidden = false;
-  $('live').hidden = false;
-  $('followups').hidden = false;
-  $('export').hidden = false;
-  renderCoverage();
-}
-
-function renderCoverage() {
-  const { covered, total } = coverage(state);
-  $('coverage').textContent = `${covered} of ${total} skills covered`;
-}
-
-$('make-checklist').addEventListener('click', async () => {
-  const jobDescription = $('job-description').value.trim();
-  if (!jobDescription) return setStatus('Paste the job description first.', true);
-
-  const button = $('make-checklist');
-  button.disabled = true;
-  setStatus('Making the checklist…');
+  let first = 'live';
   try {
-    const data = await api('/api/skills', { jobDescription });
-    if (!data.skills?.length) return setStatus('No skills found. Try a fuller job description.', true);
-    state = startInterview(data.skills);
-    await save();
-    renderInterview();
-    setStatus('Checklist ready.');
-  } catch (err) {
-    setStatus(err.message || 'We couldn’t reach the server. Check the address in Settings.', true);
-  } finally {
-    button.disabled = false;
-  }
-});
+    first = localStorage.getItem('debriefTab') || 'live';
+  } catch {}
+  showTab(TABS.includes(first) ? first : 'live');
 
-// ---- Live transcript ----
+  if (removed) toast(`${removed} candidate${removed === 1 ? '' : 's'} removed: not changed for longer than your Settings allow.`);
+  if (!getSettings().appToken) toast('Add the server address and app token in Settings to use AI features.');
 
-// The consent box must be ticked before listening can start.
-$('consent').addEventListener('change', () => {
-  $('start-listening').disabled = !$('consent').checked || Boolean(listening);
-});
-
-function renderTranscript(transcript) {
-  const box = $('transcript');
-  box.replaceChildren();
-  for (const line of transcript.lines) {
-    const p = document.createElement('p');
-    p.textContent = line.text;
-    box.append(p);
-  }
-  if (transcript.interim) {
-    const p = document.createElement('p');
-    p.className = 'interim';
-    p.textContent = transcript.interim;
-    box.append(p);
-  }
-  box.scrollTop = box.scrollHeight;
+  // Closing the panel stops listening (the browser ends the audio anyway); say so if it was on.
+  window.addEventListener('beforeunload', (e) => {
+    if (isListening()) e.preventDefault();
+  });
 }
 
-function setListeningUi(isListening) {
-  $('start-listening').hidden = isListening;
-  $('stop-listening').hidden = !isListening;
-  $('start-listening').disabled = isListening || !$('consent').checked;
-}
-
-$('start-listening').addEventListener('click', async () => {
-  if (!$('consent').checked) return setStatus('Confirm the candidate knows the call is being transcribed first.', true);
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) return setStatus('Open the call in this browser window first.', true);
-
-  setStatus('Starting…');
-  try {
-    listening = await startListening({
-      tabId: tab.id,
-      getKey: () => api('/api/transcribe-token'),
-      onTranscript: renderTranscript,
-      onStatus: (text, isError) => {
-        setStatus(text, isError);
-        if (isError && listening) {
-          listening = null;
-          setListeningUi(false);
-        }
-      },
-    });
-    setListeningUi(true);
-  } catch (err) {
-    setStatus(err.message || 'We couldn’t start listening. Please try again.', true);
-  }
+main().catch((err) => {
+  console.error('[debrief] could not start', err);
+  toast('Debrief couldn’t start. Close and reopen the panel.', { error: true });
 });
-
-$('stop-listening').addEventListener('click', () => {
-  if (!listening) return;
-  listening.stop();
-  listening = null;
-  setListeningUi(false);
-});
-
-// ---- Follow-up suggestions ----
-
-$('suggest').addEventListener('click', async () => {
-  const index = Number($('followup-skill').value);
-  const answer = $('followup-answer').value.trim();
-  if (!answer) return setStatus('Type or paste the candidate’s answer first.', true);
-
-  const button = $('suggest');
-  button.disabled = true;
-  setStatus('Thinking of follow-ups…');
-  try {
-    const data = await api('/api/followups', {
-      skill: state.skills[index].name,
-      question: $('followup-question').value.trim(),
-      answer,
-    });
-    renderSuggestions(data.questions || []);
-    setStatus(data.questions?.length ? '' : 'No follow-ups to suggest for this answer.');
-  } catch (err) {
-    setStatus(err.message || 'We couldn’t reach the server. Check the address in Settings.', true);
-  } finally {
-    button.disabled = false;
-  }
-});
-
-// Each suggestion is a plain line the interviewer can read aloud or copy. Nothing is sent back to the server.
-function renderSuggestions(questions) {
-  const list = $('suggestions');
-  list.replaceChildren();
-  for (const q of questions) {
-    const item = document.createElement('li');
-    item.textContent = q;
-    list.append(item);
-  }
-}
-
-$('copy-notes').addEventListener('click', async () => {
-  if (!state) return;
-  const text = toMarkdown(state, { date: new Date().toISOString().slice(0, 10) });
-  try {
-    await navigator.clipboard.writeText(text);
-    setStatus('Notes copied.');
-  } catch {
-    setStatus('Could not copy. Select the notes and copy them by hand.', true);
-  }
-});
-
-async function restore() {
-  await loadSettings();
-  const saved = await chrome.storage.local.get({ [STORE_KEY]: null });
-  if (saved[STORE_KEY]?.skills?.length) {
-    state = saved[STORE_KEY];
-    renderInterview();
-  }
-}
-
-restore();

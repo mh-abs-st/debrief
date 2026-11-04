@@ -41,3 +41,8 @@ export function transcriptText(transcript) {
   if (transcript.interim) parts.push(transcript.interim);
   return parts.join('\n');
 }
+
+// The last few final lines (the candidate's most recent answer, roughly), for follow-up suggestions.
+export function recentText(transcript, maxLines = 6) {
+  return transcript.lines.slice(-maxLines).map((l) => l.text).join(' ');
+}

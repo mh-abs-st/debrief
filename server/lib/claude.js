@@ -3,8 +3,9 @@
 
 export const API_URL = 'https://api.anthropic.com/v1/messages';
 
-export function makeClaude({ apiKey, fetchImpl = fetch, timeoutMs = 30_000 }) {
+export function makeClaude({ apiKey, fetchImpl = fetch, timeoutMs = 60_000 }) {
   // Returns the full text of a single, non-streamed reply.
+  // user: a string, or content blocks (e.g. a PDF document block plus a text block).
   return async function complete({ model, system, user, maxTokens = 600 }) {
     const res = await fetchImpl(API_URL, {
       method: 'POST',
