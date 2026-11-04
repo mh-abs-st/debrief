@@ -1,17 +1,19 @@
-import http from "node:http";
+import { createApp } from './lib/app.js';
+import { makeClaude } from './lib/claude.js';
 
-const port = Number(process.env.PORT) || 8787;
+const {
+  PORT = '8787',
+  ANTHROPIC_API_KEY = '',
+  DEBRIEF_APP_TOKEN = '',
+  FAST_MODEL = 'claude-haiku-5-5',
+} = process.env;
 
-const server = http.createServer((req, res) => {
-  if (req.method === "GET" && req.url === "/health") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ok: true, service: "debrief" }));
-    return;
-  }
-  res.writeHead(404, { "Content-Type": "application/json" });
-  res.end(JSON.stringify({ error: "not_found" }));
-});
+if (!ANTHROPIC_API_KEY) console.warn('[warn] ANTHROPIC_API_KEY is not set. AI features will fail.');
+if (!DEBRIEF_APP_TOKEN) console.warn('[warn] DEBRIEF_APP_TOKEN is not set. The API will refuse all requests until it is.');
 
-server.listen(port, () => {
-  console.log(`Debrief server listening on http://localhost:${port}`);
+const complete = makeClaude({ apiKey: ANTHROPIC_API_KEY });
+const server = createApp({ complete, appToken: DEBRIEF_APP_TOKEN, models: { fast: FAST_MODEL } });
+
+server.listen(Number(PORT), () => {
+  console.log(`Debrief server listening on http://localhost:${PORT}`);
 });

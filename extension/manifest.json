@@ -3,7 +3,8 @@
   "name": "Debrief",
   "version": "0.1.0",
   "description": "A side-panel assistant that helps interviewers ask better follow-up questions and keep structured notes.",
-  "permissions": ["sidePanel", "storage", "activeTab"],
+  "permissions": ["sidePanel", "storage"],
+  "host_permissions": ["http://localhost:8787/*"],
   "background": {
     "service_worker": "background.js",
     "type": "module"

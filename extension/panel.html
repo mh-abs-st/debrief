@@ -9,8 +9,33 @@
   <body>
     <main>
       <h1>Debrief</h1>
-      <p class="muted">Paste the job description to start a checklist of required skills.</p>
-      <p id="status" role="status"></p>
+
+      <section id="setup-job">
+        <h2>1. Paste the job description</h2>
+        <p class="muted">We'll list the skills this role needs, so you can check them off during the interview.</p>
+        <textarea id="job-description" rows="8" placeholder="Paste the job description here"></textarea>
+        <button id="make-checklist" type="button">Make checklist</button>
+      </section>
+
+      <section id="checklist" hidden>
+        <h2>Skills to cover</h2>
+        <ul id="skills"></ul>
+      </section>
+
+      <section id="settings">
+        <details>
+          <summary>Settings</summary>
+          <label>Server address
+            <input id="server-url" type="url" value="http://localhost:8787" />
+          </label>
+          <label>App token
+            <input id="app-token" type="password" autocomplete="off" />
+          </label>
+          <button id="save-settings" type="button">Save</button>
+        </details>
+      </section>
+
+      <p id="status" role="status" aria-live="polite"></p>
     </main>
     <script type="module" src="panel.js"></script>
   </body>
