@@ -3,8 +3,26 @@
 
 export const DEEPGRAM_MODEL = 'nova-3';
 
+export interface TranscriptLine {
+  text: string;
+  final: boolean;
+}
+
+// Final lines are kept; the newest interim line is replaced as speech continues.
+export interface Transcript {
+  lines: TranscriptLine[];
+  interim: string;
+}
+
+// The parts of a Deepgram live message we read. Anything else in the message is ignored.
+export interface DeepgramMessage {
+  type?: string;
+  is_final?: boolean;
+  channel?: { alternatives?: Array<{ transcript?: string }> };
+}
+
 // Query string for Deepgram live speech-to-text. mip_opt_out keeps call audio out of model training.
-export function listenUrl({ language = 'en' } = {}) {
+export function listenUrl({ language = 'en' }: { language?: string } = {}): string {
   const params = new URLSearchParams({
     model: DEEPGRAM_MODEL,
     language,
@@ -18,13 +36,12 @@ export function listenUrl({ language = 'en' } = {}) {
   return `wss://api.deepgram.com/v1/listen?${params}`;
 }
 
-// lines: [{ text, final }]. Final lines are kept; the newest interim line is replaced as speech continues.
-export function emptyTranscript() {
+export function emptyTranscript(): Transcript {
   return { lines: [], interim: '' };
 }
 
 // Applies one Deepgram message. Returns the new transcript (the input is not changed).
-export function applyMessage(transcript, msg) {
+export function applyMessage(transcript: Transcript, msg: DeepgramMessage | null | undefined): Transcript {
   if (msg?.type !== 'Results') return transcript;
   const text = (msg.channel?.alternatives?.[0]?.transcript || '').trim();
   if (!text) return transcript;
@@ -36,13 +53,13 @@ export function applyMessage(transcript, msg) {
 }
 
 // Plain text of the whole transcript, for copying or for the notes.
-export function transcriptText(transcript) {
+export function transcriptText(transcript: Transcript): string {
   const parts = transcript.lines.map((l) => l.text);
   if (transcript.interim) parts.push(transcript.interim);
   return parts.join('\n');
 }
 
 // The last few final lines (the candidate's most recent answer, roughly), for follow-up suggestions.
-export function recentText(transcript, maxLines = 6) {
+export function recentText(transcript: Transcript, maxLines = 6): string {
   return transcript.lines.slice(-maxLines).map((l) => l.text).join(' ');
 }

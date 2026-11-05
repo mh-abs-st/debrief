@@ -1,10 +1,20 @@
 // Calls to the Debrief server. Errors come back as short, friendly messages for the panel.
-import { getSettings } from './data.js';
+import { getSettings } from './data.ts';
+import type { Plan, Skill } from './store.ts';
 
-export async function api(path, body = {}) {
+// What each server route replies with (see server/lib/app.ts).
+export interface ApiReplies {
+  '/api/skills': { skills: Skill[] };
+  '/api/followups': { questions: string[] };
+  '/api/plan': { plan: Plan };
+  '/api/resume/parse': { text: string };
+  '/api/transcribe-token': { key: string; expiresIn: number };
+}
+
+export async function api<P extends keyof ApiReplies>(path: P, body: object = {}): Promise<ApiReplies[P]> {
   const { serverUrl, appToken } = getSettings();
   if (!appToken) throw new Error('Add the app token in Settings first.');
-  let res;
+  let res: Response;
   try {
     res = await fetch(`${String(serverUrl).replace(/\/+$/, '')}${path}`, {
       method: 'POST',
@@ -16,5 +26,5 @@ export async function api(path, body = {}) {
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.message || 'Something went wrong. Please try again.');
-  return data;
+  return data as ApiReplies[P];
 }

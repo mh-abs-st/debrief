@@ -1,17 +1,32 @@
 // Small DOM helpers. Everything is built with createElement and textContent (never innerHTML),
 // so text from jobs, resumes or the AI can't inject markup.
 
-export const $ = (id) => document.getElementById(id);
+export type Tab = 'live' | 'prepare' | 'jobs' | 'demo';
+
+// Moves to a tab with a job or candidate already chosen (panel.ts passes it to each view as onGo).
+export type GoTo = (tab: Tab, opts?: { jobId?: string | null; candidateId?: string; addCandidate?: boolean }) => void;
+
+// The element with this id in panel.html. Say which kind when you need its fields: $<HTMLInputElement>('setToken').
+export const $ = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
+
+// The element an event came from, for delegated clicks: closestTarget(e, '[data-v]').
+export const closestTarget = <T extends HTMLElement = HTMLElement>(e: Event, selector: string): T | null =>
+  e.target instanceof Element ? (e.target.closest(selector) as T | null) : null;
+
+export type Child = Node | string | number | boolean | null | undefined;
+
+// class, dataset, on<event> handlers, DOM properties (value, checked, disabled…) or plain attributes.
+export type Attrs = Record<string, unknown>;
 
 // el('button', { class: 'primary-btn', onclick: fn, type: 'button' }, 'Save')
-export function el(tag, attrs = {}, ...children) {
+export function el<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Attrs | null = {}, ...children: Array<Child | Child[]>): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(attrs || {})) {
     if (value === undefined || value === null || value === false) continue;
-    if (key === 'class') node.className = value;
+    if (key === 'class') node.className = String(value);
     else if (key === 'dataset') Object.assign(node.dataset, value);
-    else if (key.startsWith('on') && typeof value === 'function') node.addEventListener(key.slice(2), value);
-    else if (key === 'value' || (key in node && typeof value !== 'string')) node[key] = value;
+    else if (key.startsWith('on') && typeof value === 'function') node.addEventListener(key.slice(2), value as EventListener);
+    else if (key === 'value' || (key in node && typeof value !== 'string')) Reflect.set(node, key, value);
     else node.setAttribute(key, value === true ? '' : String(value));
   }
   for (const child of children.flat()) {
@@ -21,7 +36,7 @@ export function el(tag, attrs = {}, ...children) {
   return node;
 }
 
-export function icon(name) {
+export function icon(name: string): SVGSVGElement {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('aria-hidden', 'true');
   const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
@@ -31,8 +46,8 @@ export function icon(name) {
 }
 
 // A short message at the bottom of the panel. Errors stay until the next message; others fade.
-let toastTimer = null;
-export function toast(message, { error = false } = {}) {
+let toastTimer: ReturnType<typeof setTimeout> | undefined;
+export function toast(message: string, { error = false }: { error?: boolean } = {}): void {
   const box = $('toast');
   if (!box) return;
   clearTimeout(toastTimer);
@@ -43,30 +58,38 @@ export function toast(message, { error = false } = {}) {
 }
 
 // Opens a <dialog> sheet. Any [data-close] button inside closes it.
-export function openSheet(id) {
-  const dialog = $(id);
+export function openSheet(id: string): HTMLDialogElement {
+  const dialog = $<HTMLDialogElement>(id);
   if (!dialog.dataset.wired) {
     dialog.dataset.wired = '1';
     dialog.addEventListener('click', (e) => {
-      if (e.target.closest('[data-close]') || e.target === dialog) dialog.close();
+      if (closestTarget(e, '[data-close]') || e.target === dialog) dialog.close();
     });
   }
   if (!dialog.open) dialog.showModal();
   return dialog;
 }
 
+export interface ConfirmOptions {
+  title: string;
+  body: string;
+  yes?: string;
+  no?: string;
+  danger?: boolean;
+}
+
 // Asks a yes/no question in a sheet (no browser confirm(), which blocks the page).
-export function confirmSheet({ title, body, yes = 'Delete', no = 'Keep', danger = true }) {
+export function confirmSheet({ title, body, yes = 'Delete', no = 'Keep', danger = true }: ConfirmOptions): Promise<boolean> {
   return new Promise((resolve) => {
     $('confirmTitle').textContent = title;
     $('confirmBody').textContent = body;
-    const yesBtn = $('confirmYes');
-    const noBtn = $('confirmNo');
+    const yesBtn = $<HTMLButtonElement>('confirmYes');
+    const noBtn = $<HTMLButtonElement>('confirmNo');
     yesBtn.textContent = yes;
     noBtn.textContent = no;
     yesBtn.classList.toggle('danger', danger);
     const dialog = openSheet('confirmSheet');
-    const done = (answer) => {
+    const done = (answer: boolean) => {
       yesBtn.onclick = noBtn.onclick = null;
       dialog.removeEventListener('close', onClose);
       if (dialog.open) dialog.close();
@@ -81,13 +104,13 @@ export function confirmSheet({ title, body, yes = 'Delete', no = 'Keep', danger 
 }
 
 // Fills a <select> and keeps the current choice when it still exists.
-export function fillSelect(select, options, value) {
+export function fillSelect(select: HTMLSelectElement, options: Array<{ value: string; label: string }>, value: string): string {
   select.replaceChildren(...options.map((o) => new Option(o.label, o.value)));
   if (options.some((o) => o.value === value)) select.value = value;
   return select.value;
 }
 
-export function formatDate(value) {
+export function formatDate(value: string): string {
   if (!value) return '';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '';
@@ -95,7 +118,7 @@ export function formatDate(value) {
 }
 
 // Reads a file as base64 (without the data: prefix).
-export function fileToBase64(file) {
+export function fileToBase64(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
@@ -105,7 +128,7 @@ export function fileToBase64(file) {
 }
 
 // Busy state for a button while something runs.
-export async function withBusy(button, label, task) {
+export async function withBusy<T>(button: HTMLButtonElement, label: string, task: () => Promise<T>): Promise<T> {
   const original = button.textContent;
   button.disabled = true;
   if (label) button.textContent = label;
@@ -117,3 +140,7 @@ export async function withBusy(button, label, task) {
     if (!label || button.textContent === label) button.textContent = original;
   }
 }
+
+// The message to show for something caught: our own errors already carry a friendly one.
+export const errorMessage = (err: unknown, fallback = 'Something went wrong. Please try again.'): string =>
+  err instanceof Error && err.message ? err.message : fallback;

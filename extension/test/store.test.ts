@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import * as S from '../store.js';
+import * as S from '../src/store.ts';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -36,12 +36,12 @@ test('profile links: bare domains get https, unsafe schemes are dropped', () => 
 
 test('a new resume clears the old interview plan', () => {
   let { state, ana } = seed();
-  state = S.updateCandidate(state, ana.id, { plan: { skills: [] } });
-  assert.ok(S.getCandidate(state, ana.id).plan);
+  state = S.updateCandidate(state, ana.id, { plan: { opening: '', skills: [], verify: [] } });
+  assert.ok(S.getCandidate(state, ana.id)?.plan);
   state = S.updateCandidate(state, ana.id, { resumeText: 'Node 5 years' }); // same text: plan kept
-  assert.ok(S.getCandidate(state, ana.id).plan);
+  assert.ok(S.getCandidate(state, ana.id)?.plan);
   state = S.updateCandidate(state, ana.id, { resumeText: 'Go 3 years' });
-  assert.equal(S.getCandidate(state, ana.id).plan, null);
+  assert.equal(S.getCandidate(state, ana.id)?.plan, null);
 });
 
 test('interviews copy the job skills and track coverage and notes', () => {
@@ -51,20 +51,20 @@ test('interviews copy the job skills and track coverage and notes', () => {
   state = S.setSkillNotes(state, started.interview.id, 0, 'Built a queue service');
   const iv = S.openInterview(state, ana.id);
   assert.deepEqual(S.coverage(iv), { covered: 1, total: 2 });
-  assert.equal(iv.skills[0].notes, 'Built a queue service');
+  assert.equal(iv?.skills[0].notes, 'Built a queue service');
 });
 
 test('ending an interview marks the candidate interviewed, but not if already decided', () => {
   let { state, ana, ben } = seed();
   let r = S.startInterview(state, ana.id, 2000);
   state = S.endInterview(r.state, r.interview.id, 3000);
-  assert.equal(S.getCandidate(state, ana.id).stage, 'interviewed');
+  assert.equal(S.getCandidate(state, ana.id)?.stage, 'interviewed');
   assert.equal(S.openInterview(state, ana.id), null);
 
   state = S.updateCandidate(state, ben.id, { stage: 'decided' });
   r = S.startInterview(state, ben.id, 4000);
   state = S.endInterview(r.state, r.interview.id, 5000);
-  assert.equal(S.getCandidate(state, ben.id).stage, 'decided');
+  assert.equal(S.getCandidate(state, ben.id)?.stage, 'decided');
 });
 
 test('deleting a candidate deletes their interviews; deleting a job deletes everything under it', () => {

@@ -1,25 +1,106 @@
 // Debrief's data: jobs, the candidates for each job, and the interviews (your notes) for each candidate.
 // Pure functions only (no Chrome or DOM), so they can be tested in Node. Every function returns a new state.
 // Everything is saved on the interviewer's computer (chrome.storage.local), never on the server.
-//
-// state = {
-//   jobs:       [{ id, title, company, description, skills: [{ name, why }], status: 'open'|'closed', createdAt, updatedAt }]
-//   candidates: [{ id, jobId, name, email, profileUrl, resumeText, stage, interviewAt, plan, createdAt, updatedAt }]
-//   interviews: [{ id, jobId, candidateId, startedAt, endedAt, skills: [{ name, why, covered, notes }], generalNotes }]
-// }
 
-export const STAGES = ['new', 'scheduled', 'interviewed', 'decided'];
-export const STAGE_LABELS = { new: 'New', scheduled: 'Scheduled', interviewed: 'Interviewed', decided: 'Decided' };
+export const STAGES = ['new', 'scheduled', 'interviewed', 'decided'] as const;
+export type Stage = (typeof STAGES)[number];
+export const STAGE_LABELS: Record<Stage, string> = { new: 'New', scheduled: 'Scheduled', interviewed: 'Interviewed', decided: 'Decided' };
 
 export const LIMITS = { title: 120, company: 120, description: 20_000, name: 120, email: 200, url: 500, resume: 30_000, notes: 10_000 };
 
-export function emptyState() {
+export interface Skill {
+  name: string;
+  why: string;
+}
+
+export interface Job {
+  id: string;
+  title: string;
+  company: string;
+  description: string;
+  skills: Skill[];
+  status: 'open' | 'closed';
+  createdAt: number;
+  updatedAt: number;
+}
+
+// The interview plan from the server (see server/lib/plan.ts). No score, no fit label.
+export interface PlanSkill {
+  name: string;
+  resumeShows: string;
+  askAbout: string;
+  questions: string[];
+}
+
+export interface Plan {
+  opening: string;
+  skills: PlanSkill[];
+  verify: Array<{ claim: string; question: string }>;
+}
+
+export interface Candidate {
+  id: string;
+  jobId: string;
+  name: string;
+  email: string;
+  profileUrl: string;
+  resumeText: string;
+  stage: Stage;
+  interviewAt: string;
+  plan: Plan | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface InterviewSkill extends Skill {
+  covered: boolean;
+  notes: string;
+}
+
+export interface Interview {
+  id: string;
+  jobId: string;
+  candidateId: string;
+  startedAt: number;
+  endedAt: number | null;
+  skills: InterviewSkill[];
+  generalNotes: string;
+}
+
+export interface State {
+  jobs: Job[];
+  candidates: Candidate[];
+  interviews: Interview[];
+}
+
+// What the job and candidate forms send. Every field is optional and cleaned before it is stored.
+export interface JobFields {
+  title?: string;
+  company?: string;
+  description?: string;
+  skills?: Array<{ name?: string; why?: string }>;
+  status?: string;
+}
+
+export interface CandidateFields {
+  name?: string;
+  email?: string;
+  profileUrl?: string;
+  resumeText?: string;
+  stage?: string;
+  interviewAt?: string;
+  plan?: Plan | null;
+}
+
+export const isStage = (value: unknown): value is Stage => (STAGES as readonly unknown[]).includes(value);
+
+export function emptyState(): State {
   return { jobs: [], candidates: [], interviews: [] };
 }
 
 // Makes sure stored data has the expected shape (older or damaged data never breaks the panel).
-export function normalize(raw) {
-  const s = raw && typeof raw === 'object' ? raw : {};
+export function normalize(raw: unknown): State {
+  const s = (raw && typeof raw === 'object' ? raw : {}) as Partial<Record<keyof State, unknown>>;
   return {
     jobs: Array.isArray(s.jobs) ? s.jobs : [],
     candidates: Array.isArray(s.candidates) ? s.candidates : [],
@@ -28,15 +109,15 @@ export function normalize(raw) {
 }
 
 let counter = 0;
-export function newId(prefix, now = Date.now()) {
+export function newId(prefix: string, now: number = Date.now()): string {
   counter = (counter + 1) % 1e6;
   return `${prefix}_${now.toString(36)}${counter.toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
 
-const clip = (v, max) => String(v ?? '').trim().slice(0, max);
+const clip = (v: unknown, max: number): string => String(v ?? '').trim().slice(0, max);
 
 // Only http(s) links are kept, so a pasted "javascript:" link can never be opened.
-export function cleanUrl(value) {
+export function cleanUrl(value: unknown): string {
   const v = clip(value, LIMITS.url);
   if (!v) return '';
   try {
@@ -47,8 +128,8 @@ export function cleanUrl(value) {
   }
 }
 
-function cleanSkills(skills) {
-  return (Array.isArray(skills) ? skills : [])
+function cleanSkills(skills: unknown): Skill[] {
+  return (Array.isArray(skills) ? (skills as Array<{ name?: unknown; why?: unknown } | null>) : [])
     .map((s) => ({ name: clip(s?.name, 80), why: clip(s?.why, 200) }))
     .filter((s) => s.name)
     .slice(0, 12);
@@ -56,8 +137,8 @@ function cleanSkills(skills) {
 
 // ---------- Jobs ----------
 
-export function addJob(state, fields, now = Date.now()) {
-  const job = {
+export function addJob(state: State, fields: JobFields, now: number = Date.now()): { state: State; job: Job } {
+  const job: Job = {
     id: newId('job', now),
     title: clip(fields.title, LIMITS.title) || 'Untitled job',
     company: clip(fields.company, LIMITS.company),
@@ -70,7 +151,7 @@ export function addJob(state, fields, now = Date.now()) {
   return { state: { ...state, jobs: [...state.jobs, job] }, job };
 }
 
-export function updateJob(state, id, fields, now = Date.now()) {
+export function updateJob(state: State, id: string, fields: JobFields, now: number = Date.now()): State {
   const jobs = state.jobs.map((j) => {
     if (j.id !== id) return j;
     const next = { ...j, updatedAt: now };
@@ -85,7 +166,7 @@ export function updateJob(state, id, fields, now = Date.now()) {
 }
 
 // Deleting a job deletes its candidates and their interview notes too.
-export function removeJob(state, id) {
+export function removeJob(state: State, id: string): State {
   return {
     jobs: state.jobs.filter((j) => j.id !== id),
     candidates: state.candidates.filter((c) => c.jobId !== id),
@@ -93,32 +174,32 @@ export function removeJob(state, id) {
   };
 }
 
-export function getJob(state, id) {
+export function getJob(state: State, id: string | null | undefined): Job | null {
   return state.jobs.find((j) => j.id === id) || null;
 }
 
-export function jobsByStatus(state, status = 'open') {
+export function jobsByStatus(state: State, status: string = 'open'): Job[] {
   const list = status === 'all' ? state.jobs : state.jobs.filter((j) => j.status === status);
   return [...list].sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-export function jobLabel(job) {
+export function jobLabel(job: Job | null | undefined): string {
   if (!job) return '';
   return job.company ? `${job.title} · ${job.company}` : job.title;
 }
 
 // ---------- Candidates ----------
 
-export function addCandidate(state, jobId, fields, now = Date.now()) {
+export function addCandidate(state: State, jobId: string, fields: CandidateFields, now: number = Date.now()): { state: State; candidate: Candidate } {
   if (!getJob(state, jobId)) throw new Error('That job no longer exists.');
-  const candidate = {
+  const candidate: Candidate = {
     id: newId('cand', now),
     jobId,
     name: clip(fields.name, LIMITS.name) || 'Unnamed candidate',
     email: clip(fields.email, LIMITS.email),
     profileUrl: cleanUrl(fields.profileUrl),
     resumeText: clip(fields.resumeText, LIMITS.resume),
-    stage: STAGES.includes(fields.stage) ? fields.stage : 'new',
+    stage: isStage(fields.stage) ? fields.stage : 'new',
     interviewAt: clip(fields.interviewAt, 40),
     plan: null,
     createdAt: now,
@@ -127,7 +208,7 @@ export function addCandidate(state, jobId, fields, now = Date.now()) {
   return { state: { ...state, candidates: [...state.candidates, candidate] }, candidate };
 }
 
-export function updateCandidate(state, id, fields, now = Date.now()) {
+export function updateCandidate(state: State, id: string, fields: CandidateFields, now: number = Date.now()): State {
   const candidates = state.candidates.map((c) => {
     if (c.id !== id) return c;
     const next = { ...c, updatedAt: now };
@@ -138,7 +219,7 @@ export function updateCandidate(state, id, fields, now = Date.now()) {
       next.resumeText = clip(fields.resumeText, LIMITS.resume);
       if (next.resumeText !== c.resumeText) next.plan = null; // a new resume needs a new plan
     }
-    if ('stage' in fields && STAGES.includes(fields.stage)) next.stage = fields.stage;
+    if ('stage' in fields && isStage(fields.stage)) next.stage = fields.stage;
     if ('interviewAt' in fields) next.interviewAt = clip(fields.interviewAt, 40);
     if ('plan' in fields) next.plan = fields.plan || null;
     return next;
@@ -147,7 +228,7 @@ export function updateCandidate(state, id, fields, now = Date.now()) {
 }
 
 // Deleting a candidate deletes everything about them: profile, resume, plan and interview notes.
-export function removeCandidate(state, id) {
+export function removeCandidate(state: State, id: string): State {
   return {
     ...state,
     candidates: state.candidates.filter((c) => c.id !== id),
@@ -155,22 +236,22 @@ export function removeCandidate(state, id) {
   };
 }
 
-export function getCandidate(state, id) {
+export function getCandidate(state: State, id: string | null | undefined): Candidate | null {
   return state.candidates.find((c) => c.id === id) || null;
 }
 
-export function candidatesFor(state, jobId) {
+export function candidatesFor(state: State, jobId: string): Candidate[] {
   return state.candidates.filter((c) => c.jobId === jobId).sort((a, b) => a.createdAt - b.createdAt);
 }
 
 // ---------- Interviews (your notes for one call) ----------
 
 // Starts a new interview for a candidate, with the job's skills as the checklist.
-export function startInterview(state, candidateId, now = Date.now()) {
+export function startInterview(state: State, candidateId: string, now: number = Date.now()): { state: State; interview: Interview } {
   const candidate = getCandidate(state, candidateId);
   if (!candidate) throw new Error('That candidate no longer exists.');
   const job = getJob(state, candidate.jobId);
-  const interview = {
+  const interview: Interview = {
     id: newId('iv', now),
     jobId: candidate.jobId,
     candidateId,
@@ -182,31 +263,31 @@ export function startInterview(state, candidateId, now = Date.now()) {
   return { state: { ...state, interviews: [...state.interviews, interview] }, interview };
 }
 
-export function updateInterview(state, id, change) {
+export function updateInterview(state: State, id: string, change: (iv: Interview) => Interview): State {
   const interviews = state.interviews.map((iv) => (iv.id === id ? change(iv) : iv));
   return { ...state, interviews };
 }
 
-export function setSkillCovered(state, interviewId, index, covered) {
+export function setSkillCovered(state: State, interviewId: string, index: number, covered: boolean): State {
   return updateInterview(state, interviewId, (iv) => ({
     ...iv,
     skills: iv.skills.map((s, i) => (i === index ? { ...s, covered: Boolean(covered) } : s)),
   }));
 }
 
-export function setSkillNotes(state, interviewId, index, notes) {
+export function setSkillNotes(state: State, interviewId: string, index: number, notes: string): State {
   return updateInterview(state, interviewId, (iv) => ({
     ...iv,
     skills: iv.skills.map((s, i) => (i === index ? { ...s, notes: clip(notes, LIMITS.notes) } : s)),
   }));
 }
 
-export function setGeneralNotes(state, interviewId, notes) {
+export function setGeneralNotes(state: State, interviewId: string, notes: string): State {
   return updateInterview(state, interviewId, (iv) => ({ ...iv, generalNotes: clip(notes, LIMITS.notes) }));
 }
 
 // Ending an interview also moves the candidate to "Interviewed" (unless already decided).
-export function endInterview(state, interviewId, now = Date.now()) {
+export function endInterview(state: State, interviewId: string, now: number = Date.now()): State {
   const iv = state.interviews.find((i) => i.id === interviewId);
   if (!iv) return state;
   let next = updateInterview(state, interviewId, (x) => ({ ...x, endedAt: x.endedAt || now }));
@@ -215,16 +296,16 @@ export function endInterview(state, interviewId, now = Date.now()) {
   return next;
 }
 
-export function interviewsFor(state, candidateId) {
+export function interviewsFor(state: State, candidateId: string): Interview[] {
   return state.interviews.filter((i) => i.candidateId === candidateId).sort((a, b) => b.startedAt - a.startedAt);
 }
 
 // The open (not ended) interview for a candidate, if any.
-export function openInterview(state, candidateId) {
+export function openInterview(state: State, candidateId: string): Interview | null {
   return interviewsFor(state, candidateId).find((i) => !i.endedAt) || null;
 }
 
-export function coverage(interview) {
+export function coverage(interview: Interview | null | undefined): { covered: number; total: number } {
   const total = interview?.skills?.length || 0;
   const covered = (interview?.skills || []).filter((s) => s.covered).length;
   return { covered, total };
@@ -234,10 +315,10 @@ export function coverage(interview) {
 
 // Removes candidates (and their notes) not changed for more than `days`. days = 0 means keep until deleted.
 // Returns { state, removed } so the panel can say how many were removed.
-export function purgeExpired(state, days, now = Date.now()) {
+export function purgeExpired(state: State, days: number, now: number = Date.now()): { state: State; removed: number } {
   if (!days || days <= 0) return { state, removed: 0 };
   const cutoff = now - days * 24 * 60 * 60 * 1000;
-  const lastTouched = (c) => {
+  const lastTouched = (c: Candidate) => {
     const ivTimes = state.interviews.filter((i) => i.candidateId === c.id).map((i) => i.endedAt || i.startedAt);
     return Math.max(c.updatedAt || 0, ...ivTimes);
   };
@@ -256,7 +337,7 @@ export function purgeExpired(state, days, now = Date.now()) {
 // ---------- Export ----------
 
 // Markdown notes for one interview: only what the interviewer wrote. Debrief adds no assessment.
-export function interviewMarkdown(state, interviewId) {
+export function interviewMarkdown(state: State, interviewId: string): string {
   const iv = state.interviews.find((i) => i.id === interviewId);
   if (!iv) return '';
   const job = getJob(state, iv.jobId);

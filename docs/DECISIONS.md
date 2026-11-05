@@ -25,6 +25,7 @@ Why Debrief is the way it is. Read this before changing what the AI produces, wh
 
 ## Technical
 
-- **No npm dependencies on the server** (2026-11-04): built while the cloud workspace couldn't reach npm. Built-in `http` and `fetch`; swapping in Express or the Anthropic SDK later is easy.
+- **No runtime npm dependencies on the server** (2026-11-04): built while the cloud workspace couldn't reach npm. Built-in `http` and `fetch`; swapping in Express or the Anthropic SDK later is easy. Dev dependencies for type checking are fine (see TypeScript below).
+- **TypeScript everywhere** (2026-11-05). The server and all tests run `.ts` directly with Node's type stripping (Node 22.18+), so they need no build; `tsc` only checks types. That means erasable syntax only (`erasableSyntaxOnly`): no `enum`, `namespace` or constructor parameter properties. Imports name the `.ts` file. The extension has a build step, because Chrome can't load `.ts`: `extension/src/` compiles to `extension/dist/` (load that folder unpacked). Plain `tsc`, no bundler: the output is still one ES module per file. `moduleDetection: legacy` keeps `theme-init` a classic script, which must run before the page draws.
 - **Listening runs in the side panel**, not an offscreen document like Offro. Simpler; the cost is that the panel must stay open during the call. Move to Offro's offscreen engine if that turns out to be a problem.
 - **No Google Fonts**: system fonts, so opening the panel doesn't send the interviewer's IP to Google (an EU privacy issue).

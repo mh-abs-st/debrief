@@ -1,18 +1,18 @@
 // Prepare tab: an interview plan for one candidate, from the job's skills and their resume.
 // Not a resume match: no score, no fit label, no ranking. It lists what the resume shows and what to ask.
-import { $, el, toast, withBusy } from './ui.js';
-import { getState, commit, subscribe } from './data.js';
-import { api } from './api.js';
-import { createPicker } from './picker.js';
-import * as S from './store.js';
+import { $, el, toast, withBusy, errorMessage, type GoTo } from './ui.ts';
+import { getState, commit, subscribe } from './data.ts';
+import { api } from './api.ts';
+import { createPicker, type Picker } from './picker.ts';
+import * as S from './store.ts';
 
-let picker = null;
-let goTo = () => {};
+let picker: Picker;
+let goTo: GoTo = () => {};
 
-export function initPrepare({ onGo }) {
+export function initPrepare({ onGo }: { onGo: GoTo }): void {
   goTo = onGo;
   picker = createPicker($('prepPicker'), { onChange: render });
-  $('prepMake').addEventListener('click', (e) => makePlan(e.currentTarget));
+  $('prepMake').addEventListener('click', (e) => makePlan(e.currentTarget as HTMLButtonElement));
   subscribe(() => {
     picker.refresh();
     render();
@@ -21,7 +21,7 @@ export function initPrepare({ onGo }) {
   render();
 }
 
-export function selectForPrepare(jobId, candidateId) {
+export function selectForPrepare(jobId: string | null | undefined, candidateId: string | null | undefined): void {
   picker.set(jobId, candidateId);
   render();
 }
@@ -47,7 +47,7 @@ function render() {
   body.hidden = false;
 
   // What the plan will use, and what's missing.
-  const missing = [];
+  const missing: string[] = [];
   if (!job.skills.length) missing.push('the job’s skills checklist');
   if (!cand.resumeText) missing.push('the candidate’s resume');
   const inputs = $('prepInputs');
@@ -68,13 +68,14 @@ function render() {
     `Add ${missing.join(' and ')} first. `,
     el('button', { class: 'link-btn inline', type: 'button', onclick: () => goTo('jobs', { jobId: job.id }) }, 'Open the job'),
   );
-  $('prepMake').disabled = missing.length > 0;
-  $('prepMake').textContent = cand.plan ? 'Make the plan again' : 'Make interview plan';
+  const make = $<HTMLButtonElement>('prepMake');
+  make.disabled = missing.length > 0;
+  make.textContent = cand.plan ? 'Make the plan again' : 'Make interview plan';
 
   renderPlan(cand);
 }
 
-function renderPlan(cand) {
+function renderPlan(cand: S.Candidate) {
   const view = $('prepPlan');
   const plan = cand.plan;
   if (!plan) {
@@ -83,7 +84,7 @@ function renderPlan(cand) {
     return;
   }
   view.hidden = false;
-  const parts = [];
+  const parts: HTMLElement[] = [];
   if (plan.opening) parts.push(el('div', { class: 'plan-block' }, el('h3', {}, 'Start with'), el('p', { class: 'q' }, plan.opening)));
 
   parts.push(
@@ -118,7 +119,7 @@ function renderPlan(cand) {
   view.replaceChildren(...parts);
 }
 
-async function makePlan(button) {
+async function makePlan(button: HTMLButtonElement) {
   const state = getState();
   const { candidateId } = picker.get();
   const cand = S.getCandidate(state, candidateId);
@@ -136,7 +137,7 @@ async function makePlan(button) {
       await commit(S.updateCandidate(getState(), cand.id, { plan }));
       toast('Plan ready. You’ll also see it during the interview.');
     } catch (err) {
-      toast(err.message, { error: true });
+      toast(errorMessage(err), { error: true });
     }
   });
 }

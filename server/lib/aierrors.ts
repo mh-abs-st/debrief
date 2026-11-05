@@ -12,12 +12,34 @@ export const MESSAGES = {
   request: 'Something went wrong with this request. Please try again.',
 };
 
-// { message (for people), hint (for the log), raw } for an Anthropic SDK error.
-export function describeAiError(err) {
-  const status = err?.status;
-  const raw = String(err?.message || err || '');
-  const type = err?.error?.error?.type || err?.error?.type || (raw.match(/"type":"(\w+)"/g) || []).map((m) => m.slice(8, -1)).pop() || '';
-  if (err?.name === 'APIConnectionTimeoutError' || /timed? ?out/i.test(raw)) return { message: MESSAGES.slow, hint: 'The request to Anthropic timed out.' };
+// What we read from anything thrown: an Error, a provider error with a status, or a plain value.
+export interface ErrorLike {
+  name?: string;
+  message?: string;
+  stack?: string;
+  status?: number;
+  error?: { type?: string; error?: { type?: string } };
+  raw?: string;
+  hint?: string;
+  friendly?: boolean;
+  local?: boolean;
+}
+
+// An Error carrying an HTTP status, as thrown by the Anthropic and Deepgram clients.
+export type StatusError = Error & { status?: number };
+
+// The error friendlyAiError() returns: safe message for people, details for code and logs.
+export type FriendlyError = Error & { status?: number; raw: string; hint: string; friendly: true };
+
+export const asErrorLike = (err: unknown): ErrorLike => (err && typeof err === 'object' ? (err as ErrorLike) : {});
+
+// { message (for people), hint (for the log) } for an error from the Anthropic API.
+export function describeAiError(err: unknown): { message: string; hint: string } {
+  const e = asErrorLike(err);
+  const status = e.status;
+  const raw = String(e.message || err || '');
+  const type = e.error?.error?.type || e.error?.type || (raw.match(/"type":"(\w+)"/g) || []).map((m) => m.slice(8, -1)).pop() || '';
+  if (e.name === 'APIConnectionTimeoutError' || /timed? ?out/i.test(raw)) return { message: MESSAGES.slow, hint: 'The request to Anthropic timed out.' };
   if (!status && NETWORK.test(raw)) return { message: MESSAGES.offline, hint: 'The server could not reach api.anthropic.com: its internet connection or DNS is down.' };
   if (status === 401) return { message: MESSAGES.unavailable, hint: 'Anthropic rejected the API key. Check ANTHROPIC_API_KEY and restart the server.' };
   if (status === 403)
@@ -29,81 +51,31 @@ export function describeAiError(err) {
   if (status === 529 || type === 'overloaded_error') return { message: MESSAGES.busy, hint: 'Anthropic is overloaded (529). Temporary.' };
   if (/credit balance|billing/i.test(raw)) return { message: MESSAGES.unavailable, hint: 'The Anthropic account is out of credit. Add credit at console.anthropic.com → Billing.' };
   if (status === 404) return { message: MESSAGES.unavailable, hint: 'Model not found: check ASSIST_MODEL / FAST_MODEL.' };
-  if (status >= 500) return { message: MESSAGES.generic, hint: `Anthropic server error (${status}). Temporary.` };
+  if (status && status >= 500) return { message: MESSAGES.generic, hint: `Anthropic server error (${status}). Temporary.` };
   if (!status) return { message: MESSAGES.generic, hint: 'Unexpected error in the server, not from Anthropic (stack below).' };
   return { message: MESSAGES.request, hint: `Anthropic rejected the request (${status}${type ? ` ${type}` : ''}); see the raw error.` };
 }
 
 // The error to throw: friendly message for people, with status and raw details kept for code and logs.
-export function friendlyAiError(err) {
-  if (err?.friendly) return err;
+export function friendlyAiError(err: unknown): FriendlyError {
+  const e = asErrorLike(err);
+  if (e.friendly) return err as FriendlyError;
   const { message, hint } = describeAiError(err);
-  return Object.assign(new Error(message), { status: err?.status, raw: String(err?.message || err || ''), hint, friendly: true });
+  return Object.assign(new Error(message), { status: e.status, raw: String(e.message || err || ''), hint, friendly: true as const });
 }
 
 // What to send to people from a catch block. Anything that isn't already friendly is logged with its
 // stack and replaced by the fallback.
-export function userMessage(err, fallback = MESSAGES.generic) {
-  if (err?.friendly) return err.message;
-  console.error('[error]', err?.stack || err);
+export function userMessage(err: unknown, fallback: string = MESSAGES.generic): string {
+  const e = asErrorLike(err);
+  if (e.friendly) return e.message || fallback;
+  console.error('[error]', e.stack || err);
   return fallback;
 }
 
-// Cancelled on purpose (the panel dropped an answer it no longer needs): not an error.
-export const isAbort = (err) => err?.name === 'APIUserAbortError' || err?.name === 'AbortError' || /request was aborted/i.test(err?.message || '');
-// Rejections the code handles itself (callTool falls back when forced tool_choice isn't supported): don't log.
-const expected = (err) => err?.status === 400 && /tool_choice/i.test(err?.message || '');
-
-function logAndMap(err) {
-  if (isAbort(err)) return err;
-  const mapped = friendlyAiError(err);
-  if (!expected(err)) {
-    const where = err?.status ? `${err.status}` : err?.name || 'error';
-    console.error(`[ai] ${where}: ${mapped.raw.slice(0, 300)}\n     → ${mapped.hint}${err?.status ? '' : `\n${err?.stack || ''}`}`);
-  }
-  return mapped;
-}
-
-// A thin wrapper around the Anthropic client: same create()/stream() calls for our code, with friendly
-// errors and logging. It wraps from the outside and never patches the SDK, whose own stream() relies on
-// its internal create().
-export function wrapAnthropic(client) {
-  return {
-    client,
-    messages: {
-      async create(...args) {
-        try {
-          return await client.messages.create(...args);
-        } catch (err) {
-          throw logAndMap(err);
-        }
-      },
-      stream(...args) {
-        const s = client.messages.stream(...args);
-        s.on?.('error', () => {}); // errors are reported once, through finalMessage()
-        const facade = {
-          on(event, fn) {
-            s.on(event, fn);
-            return facade;
-          },
-          abort: () => s.abort(),
-          async finalMessage() {
-            try {
-              return await s.finalMessage();
-            } catch (err) {
-              throw logAndMap(err);
-            }
-          },
-        };
-        return facade;
-      },
-    },
-  };
-}
-
 // Speech-to-text: friendly message for people; technical reason logged.
-export function friendlySpeechError(err) {
-  const raw = String(err?.message || err || '');
+export function friendlySpeechError(err: unknown): string {
+  const raw = String(asErrorLike(err).message || err || '');
   const hint = /\b401\b/.test(raw)
     ? 'Deepgram rejected the API key. Check DEEPGRAM_API_KEY.'
     : /\b402\b/.test(raw)

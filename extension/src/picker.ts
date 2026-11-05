@@ -1,17 +1,28 @@
 // "For" pickers shared by Live and Prepare: choose the job, then one of its candidates.
-import { el, fillSelect } from './ui.js';
-import { getState } from './data.js';
-import * as S from './store.js';
+import { el, fillSelect } from './ui.ts';
+import { getState } from './data.ts';
+import * as S from './store.ts';
+
+export interface Pick {
+  jobId: string;
+  candidateId: string;
+}
+
+export interface Picker {
+  refresh(): Pick;
+  get(): Pick;
+  set(jobId: string | null | undefined, candidateId: string | null | undefined): Pick;
+}
 
 // Builds two selects inside `host`. onChange({ jobId, candidateId }) runs when either changes.
-export function createPicker(host, { onChange }) {
+export function createPicker(host: HTMLElement, { onChange }: { onChange: (pick: Pick) => void }): Picker {
   const jobSelect = el('select', { class: 'pick', 'aria-label': 'Job' });
   const candSelect = el('select', { class: 'pick', 'aria-label': 'Candidate' });
   host.replaceChildren(el('label', { class: 'pick-label' }, 'For'), jobSelect, candSelect);
 
-  let current = { jobId: '', candidateId: '' };
+  let current: Pick = { jobId: '', candidateId: '' };
 
-  function refresh() {
+  function refresh(): Pick {
     const state = getState();
     // Open jobs first; a closed job stays selectable if it's the one already chosen.
     const jobs = state.jobs.filter((j) => j.status === 'open' || j.id === current.jobId);
