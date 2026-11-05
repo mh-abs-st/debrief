@@ -3,7 +3,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { SKILLS_SYSTEM, FOLLOWUP_SYSTEM, parseJsonObject, cleanSkills, cleanFollowups, skillsUser, followupUser, listOf, type Skill } from './prompts.ts';
 import { PLAN_SYSTEM, planUser, cleanPlan } from './plan.ts';
 import { RESUME_SYSTEM, MAX_PDF_BYTES, base64Bytes, resumeContent, resumeErrorMessage } from './resume.ts';
-import { friendlyAiError, userMessage, asErrorLike, MESSAGES } from './aierrors.ts';
+import { friendlyAiError, friendlySpeechError, userMessage, asErrorLike, MESSAGES } from './aierrors.ts';
 import type { Complete } from './claude.ts';
 import type { GrantKey } from './deepgram.ts';
 
@@ -160,8 +160,14 @@ export function createApp({ complete, grantKey, appToken = '', models }: AppOpti
 
       if (req.method === 'POST' && url.pathname === '/api/transcribe-token') {
         if (!grantKey) return send(res, 503, { error: 'not_configured', message: 'Live transcription isn’t set up on the server yet.' }, origin);
-        const { key, expiresIn } = await grantKey();
-        return send(res, 200, { key, expiresIn }, origin);
+        // Speech errors get speech wording (not the AI's), and the cause goes to the server log.
+        let grant;
+        try {
+          grant = await grantKey();
+        } catch (err) {
+          return send(res, 502, { error: 'speech_error', message: friendlySpeechError(err) }, origin);
+        }
+        return send(res, 200, { key: grant.key, expiresIn: grant.expiresIn }, origin);
       }
 
       return send(res, 404, { error: 'not_found' }, origin);

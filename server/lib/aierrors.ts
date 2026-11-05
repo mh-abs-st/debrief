@@ -76,7 +76,9 @@ export function userMessage(err: unknown, fallback: string = MESSAGES.generic): 
 // Speech-to-text: friendly message for people; technical reason logged.
 export function friendlySpeechError(err: unknown): string {
   const raw = String(asErrorLike(err).message || err || '');
-  const hint = /\b401\b/.test(raw)
+  const hint = /insufficient permissions/i.test(raw)
+    ? 'The DEEPGRAM_API_KEY is valid but can’t create temporary keys (403 Insufficient permissions). In the Deepgram console, create a key with the Member role or higher, put it in .env and restart the server.'
+    : /\b401\b/.test(raw)
     ? 'Deepgram rejected the API key. Check DEEPGRAM_API_KEY.'
     : /\b402\b/.test(raw)
       ? 'The Deepgram account is out of credit.'

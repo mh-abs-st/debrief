@@ -165,6 +165,23 @@ test('transcribe token: hands out a short-lived key, behind the app token', asyn
   }
 });
 
+test('transcribe token: a Deepgram refusal gets a speech message, not the AI one', async () => {
+  const grantKey = async () => {
+    throw Object.assign(new Error('Deepgram 403: {"err_code":"FORBIDDEN","err_msg":"Insufficient permissions."}'), { status: 403 });
+  };
+  const app = await start({ grantKey });
+  try {
+    const res = await app.post('/api/transcribe-token', {});
+    assert.equal(res.status, 502);
+    const body = await json(res);
+    assert.equal(body.error, 'speech_error');
+    assert.match(body.message, /Transcription/);
+    assert.doesNotMatch(JSON.stringify(body), /assistant|Insufficient|FORBIDDEN/);
+  } finally {
+    await app.close();
+  }
+});
+
 test('transcribe token: unavailable when no Deepgram key is configured', async () => {
   const app = await start();
   try {

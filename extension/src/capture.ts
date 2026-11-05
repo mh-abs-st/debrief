@@ -31,8 +31,9 @@ export async function startListening({ tabId, language = 'en', getKey, onTranscr
   let streamId: string;
   try {
     streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
-  } catch {
-    throw new Error('Click the Debrief icon in Chrome’s toolbar while you’re on the call tab, then press Start listening again.');
+  } catch (err) {
+    console.warn('[debrief] tab capture refused:', err);
+    throw new Error('Chrome needs your OK for this tab. Click the Debrief icon in the toolbar while you’re on the call tab, then press Start listening again. The panel stays open.');
   }
   const constraints: TabAudioConstraints = {
     audio: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: streamId } },
@@ -54,7 +55,9 @@ export async function startListening({ tabId, language = 'en', getKey, onTranscr
   }
 
   // 3. Connect to Deepgram. The key goes in the subprotocol, as Deepgram's browser auth expects.
-  const ws = new WebSocket(listenUrl({ language }), ['token', key]);
+  // It's a temporary token from /auth/grant, so the scheme is 'bearer' ('token' is for real API keys and
+  // makes Deepgram drop the connection at once).
+  const ws = new WebSocket(listenUrl({ language }), ['bearer', key]);
   ws.binaryType = 'arraybuffer';
 
   let transcript = emptyTranscript();
