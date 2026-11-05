@@ -10,7 +10,7 @@ Interviewers at small companies and agencies who run their own interviews, with 
 2. **Candidates per job:** name, email, profile link (stored, never read), interview date, resume (PDF or pasted), stage.
 3. **Interview tab first:** opens on the running interview, or the candidate you chose, or the next one due. **Upcoming** lists who's next across open jobs, grouped by day; tap anyone to look at their page.
 4. **Candidate page, Plan:** an interview plan from their resume: evidence per skill, what to find out, questions, claims to check. No score.
-5. **Candidate page, Interview:** consent box before listening, live transcript (call tab audio → Deepgram from the browser), skills checklist with notes, follow-ups from the transcript or a typed answer, planned questions, end and save.
+5. **Candidate page, Interview:** listening starts with the interview and can be stopped and restarted, live transcript (call tab audio → Deepgram from the browser), skills checklist with notes, follow-ups from the transcript or a typed answer, planned questions, end and save.
 6. **Candidate page, Notes:** finished interviews with what was written; copy as Markdown.
 7. **Demo:** scripted interview with made-up people; no AI or saved data. From the empty Interview tab or Settings.
 8. **Settings:** server and token, call language, theme, data retention, delete everything.

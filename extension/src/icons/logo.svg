@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Debrief">
+  <!-- Debrief: a speech bubble shaped like a D, with a tick: a conversation, with what you covered checked off. -->
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#34a99b"/>
+      <stop offset="0.55" stop-color="#1d6f69"/>
+      <stop offset="1" stop-color="#124844"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="bubble" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e3f4f1"/>
+    </linearGradient>
+    <filter id="lift" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#0b3532" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect width="128" height="128" rx="28" fill="url(#tile)"/>
+  <path d="M0 28a28 28 0 0 1 28-28h72a28 28 0 0 1 28 28v18C88 58 40 58 0 46Z" fill="url(#shine)"/>
+
+  <!-- The D: straight left edge, round right side, tail at the bottom left. -->
+  <path filter="url(#lift)" fill="url(#bubble)"
+        d="M40 28H62C85 28 101 42 101 60S85 92 62 92H55L36 105L39 92C35.7 92 33 89.3 33 86V35C33 31.1 36.1 28 40 28Z"/>
+
+  <!-- The tick -->
+  <path d="M50 61L60.5 71.5L82 49" fill="none" stroke="#1d6f69" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Sparkle -->
+  <path d="M106 15C107.2 21 108.9 22.8 115 24C108.9 25.2 107.2 27 106 33C104.8 27 103.1 25.2 97 24C103.1 22.8 104.8 21 106 15Z" fill="#c9f2ea"/>
+</svg>

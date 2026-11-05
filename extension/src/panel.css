@@ -135,7 +135,6 @@ textarea { resize: vertical; }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
 .check { display: flex; gap: 8px; align-items: flex-start; font-weight: 600; margin: 0; cursor: pointer; }
 .check input { margin: 2px 0 0; width: 16px; height: 16px; accent-color: var(--accent); flex: none; }
-.consent { font-weight: 400; font-size: 13px; margin: 8px 0; }
 fieldset { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px 4px; margin: 0 0 12px; }
 legend { font-weight: 700; padding: 0 4px; }
 
@@ -171,6 +170,7 @@ details.card[open] > summary { margin-bottom: 8px; }
 .profile-link { color: var(--accent); font-size: 13px; font-weight: 600; text-decoration: none; }
 .empty { color: var(--muted); list-style: none; padding: 4px 0; }
 .empty-state { text-align: center; padding: 24px 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.brand-logo { display: block; width: 64px; height: 64px; margin-bottom: 4px; }
 .section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
 .section-head h3 { margin: 0; }
 .why { display: block; color: var(--muted); font-size: 12.5px; font-weight: 400; }
@@ -180,7 +180,7 @@ details.card[open] > summary { margin-bottom: 8px; }
 .person > .row { flex: none; flex-wrap: nowrap; gap: 12px; }
 
 /* ---------- Live ---------- */
-.listen-head { display: flex; align-items: center; gap: 8px; }
+.listen-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .listen-head b { flex: 1; }
 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line); flex: none; }
 .dot.on { background: var(--live); animation: pulse 1.6s ease-in-out infinite; }

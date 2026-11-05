@@ -8,6 +8,8 @@ const CHUNK_MS = 250;
 export interface ListenOptions {
   tabId: number;
   language?: string;
+  // The transcript so far, when listening restarts during an interview. New lines are added to it.
+  transcript?: Transcript;
   getKey: () => Promise<{ key: string }>;
   onTranscript: (transcript: Transcript) => void;
   onStatus: (text: string, isError: boolean) => void;
@@ -25,7 +27,7 @@ interface TabAudioConstraints {
 
 // Starts listening to one tab. Calls onTranscript(transcript) as lines arrive and onStatus(text, isError).
 // Returns { stop() }. Throws a user-facing Error if it can't start.
-export async function startListening({ tabId, language = 'en', getKey, onTranscript, onStatus }: ListenOptions): Promise<Listening> {
+export async function startListening({ tabId, language = 'en', transcript: initial, getKey, onTranscript, onStatus }: ListenOptions): Promise<Listening> {
   // 1. Get the tab's audio. The tab goes quiet for the user, so we also play it back below.
   // Chrome only allows this after the Debrief icon was clicked on that tab (it grants access to the tab).
   let streamId: string;
@@ -60,7 +62,7 @@ export async function startListening({ tabId, language = 'en', getKey, onTranscr
   const ws = new WebSocket(listenUrl({ language }), ['bearer', key]);
   ws.binaryType = 'arraybuffer';
 
-  let transcript = emptyTranscript();
+  let transcript = initial ? { lines: initial.lines, interim: '' } : emptyTranscript();
   let recorder: MediaRecorder | null = null;
   let keepAlive: ReturnType<typeof setInterval> | null = null;
   let stopped = false;
