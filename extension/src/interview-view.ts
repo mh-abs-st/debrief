@@ -26,9 +26,9 @@ export function initInterview(options: { onEnd: (candidateId: string) => void })
     transcript = emptyTranscript();
     renderTranscript();
     await commit(state);
-    toast('Interview started. Tick skills as you cover them.');
+    // Listening starts with the interview; it can be stopped and restarted from the listening card.
+    await start();
   });
-  $('liveConsent').addEventListener('change', updateListenButtons);
   $('liveListen').addEventListener('click', start);
   $('liveStop').addEventListener('click', () => {
     stopListening();
@@ -156,8 +156,6 @@ function updateListenButtons() {
   const on = Boolean(listening);
   button('liveListen').hidden = on;
   button('liveStop').hidden = !on;
-  button('liveListen').disabled = !input('liveConsent').checked;
-  input('liveConsent').disabled = on;
   $('liveDot').classList.toggle('on', on);
   $('liveState').textContent = on ? 'Listening' : 'Not listening';
 }
@@ -173,7 +171,6 @@ function renderTranscript() {
 }
 
 async function start() {
-  if (!input('liveConsent').checked) return toast('Tick the box first: the candidate must know the call is transcribed.', { error: true });
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   if (!tab?.id || !/^https:/.test(tab.url || '')) return toast('Open the call in a browser tab first (Google Meet, Zoom or Teams on the web).', { error: true });
   toast('Starting…');
@@ -182,6 +179,7 @@ async function start() {
     listening = await startListening({
       tabId: tab.id,
       language: getSettings().language,
+      transcript, // keep what was said before a stop
       getKey: () => api('/api/transcribe-token'),
       onTranscript: (t) => {
         transcript = t;
@@ -252,7 +250,6 @@ async function endInterview() {
   await commit(S.endInterview(getState(), iv.id));
   transcript = emptyTranscript();
   renderTranscript();
-  input('liveConsent').checked = false;
   $('liveSuggestions').replaceChildren();
   textarea('liveAnswer').value = '';
   input('liveQuestion').value = '';

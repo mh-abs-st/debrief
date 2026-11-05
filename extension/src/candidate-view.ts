@@ -128,6 +128,7 @@ function render() {
 function emptyState(state: S.State): HTMLElement[] {
   if (!state.jobs.length) {
     return [
+      el('img', { class: 'brand-logo', src: 'icons/logo.svg', alt: '', width: 64, height: 64 }),
       el('h2', {}, 'Who are you interviewing?'),
       el('p', { class: 'muted' }, 'Add the job you’re hiring for and its candidates. Your next interview shows up here.'),
       el('button', { class: 'primary-btn', type: 'button', onclick: () => nav.addJob() }, 'Add a job'),

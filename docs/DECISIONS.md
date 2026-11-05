@@ -20,7 +20,7 @@ Why Debrief is the way it is. Read this before changing what the AI produces, wh
 - **Saved only on the interviewer's computer** (`chrome.storage.local`): jobs, candidates, resumes, plans, notes. The server stores nothing.
 - **Retention:** candidates not changed for 90 days are deleted on load (Settings: 30, 90, 180, 365 days or never). Deleting a job deletes its candidates and notes.
 - **Call audio** goes from the browser straight to Deepgram with a 60-second key from our server, `mip_opt_out` on. The transcript lives in panel memory and is cleared when the interview ends; only notes are saved.
-- **Consent first:** Start listening stays disabled until the interviewer ticks that the candidate knows the call is transcribed.
+- **Listening starts with the interview** (owner, 2026-11-05). Start interview also starts listening, and the interviewer can stop and restart it at any time; the transcript continues across restarts. This replaced a consent checkbox that had to be ticked before listening. Telling the candidate is now the interviewer's job, with a reminder under Start interview; the candidate notice (issue #19) must cover it.
 - **Profile links are stored, never fetched.** Scraping LinkedIn breaks its terms and adds profiling risk.
 
 ## Technical

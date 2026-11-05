@@ -106,7 +106,8 @@
           <section class="card" id="liveSwitchBox" hidden></section>
           <div class="stack" id="liveArea">
           <section class="card" id="liveStartBox">
-            <p>Start when the call begins. You’ll get the job’s checklist, a notes box for each skill, and the live transcript.</p>
+            <p>Start when the call begins. Debrief starts listening to the call tab right away, and you get the job’s checklist and a notes box for each skill. You can stop and restart listening at any time.</p>
+            <p class="help">Let the candidate know the call is transcribed for your notes.</p>
             <p class="warn" id="liveNoSkills" hidden>This job has no skills checklist yet. You can still take notes, or add skills in Jobs first.</p>
             <button class="primary-btn" id="liveStart" type="button">Start interview</button>
           </section>
@@ -116,13 +117,9 @@
               <div class="listen-head">
                 <span class="dot" id="liveDot" aria-hidden="true"></span>
                 <b id="liveState">Not listening</b>
-                <button class="primary-btn small" id="liveListen" type="button" disabled>Start listening</button>
+                <button class="primary-btn small" id="liveListen" type="button">Start listening</button>
                 <button class="soft-btn small" id="liveStop" type="button" hidden>Stop listening</button>
               </div>
-              <label class="check consent">
-                <input id="liveConsent" type="checkbox" />
-                <span>The candidate knows this call is transcribed and agreed to it.</span>
-              </label>
               <div class="transcript" id="liveTranscript" aria-live="polite"></div>
               <div class="row end">
                 <button class="link-btn" id="liveCopyTranscript" type="button">Copy transcript</button>
@@ -314,7 +311,7 @@
             <li><b>Jobs:</b> add a job, paste its description and make the skills checklist. Add each candidate with their profile link, interview date and resume.</li>
             <li><b>Interview</b> (first tab): opens on the interview that’s running, or your next candidate. <b>Upcoming</b> lists everyone due; tap someone to see their page, then “Interview now” to make them current.</li>
             <li><b>Plan:</b> make an interview plan: what their resume shows for each skill and what to ask.</li>
-            <li><b>Interview:</b> open the call in a Chrome tab, click the Debrief icon on that tab, tell the candidate the call is transcribed, then start. Tick skills as you cover them and write notes.</li>
+            <li><b>Interview:</b> open the call in a Chrome tab, click the Debrief icon on that tab, tell the candidate the call is transcribed, then press Start interview: listening starts with it, and you can stop and restart it at any time. Tick skills as you cover them and write notes.</li>
             <li><b>Notes:</b> after you end the interview, your notes are kept there to read or copy. Debrief never scores candidates.</li>
           </ol>
         </details>
