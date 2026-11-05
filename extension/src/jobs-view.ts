@@ -1,25 +1,31 @@
 // Jobs tab: every job you're hiring for, each with its required skills and its candidates.
-import { $, el, toast, openSheet, confirmSheet, formatDate, fileToBase64, withBusy } from './ui.js';
-import { getState, commit, subscribe } from './data.js';
-import { api } from './api.js';
-import * as S from './store.js';
+import { $, el, toast, openSheet, confirmSheet, formatDate, fileToBase64, withBusy, closestTarget, errorMessage, type GoTo } from './ui.ts';
+import { getState, commit, subscribe } from './data.ts';
+import { api } from './api.ts';
+import * as S from './store.ts';
 
 let filter = 'open';
-let openJobId = null; // the job shown in detail, or null for the list
-let editingJobId = null; // null = adding a new job
-let editingCandidate = { jobId: null, id: null };
-let draftSkills = []; // skills in the job sheet while editing
+let openJobId: string | null = null; // the job shown in detail, or null for the list
+let editingJobId: string | null = null; // null = adding a new job
+let editingCandidate: { jobId: string; id: string | null } = { jobId: '', id: null };
+let draftSkills: S.Skill[] = []; // skills in the job sheet while editing
+
+const input = (id: string) => $<HTMLInputElement>(id);
+const textarea = (id: string) => $<HTMLTextAreaElement>(id);
+const dialog = (id: string) => $<HTMLDialogElement>(id);
 
 // Other tabs ask to show something here (e.g. "Add a job" from an empty Live tab).
-let goTo = () => {};
-export function initJobs({ onGo }) {
+let goTo: GoTo = () => {};
+export function initJobs({ onGo }: { onGo: GoTo }): void {
   goTo = onGo;
 
   $('jobsFilter').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-v]');
+    const btn = closestTarget(e, '[data-v]');
     if (!btn) return;
-    filter = btn.dataset.v;
-    $('jobsFilter').querySelectorAll('[data-v]').forEach((b) => b.setAttribute('aria-checked', String(b === btn)));
+    filter = btn.dataset.v || 'open';
+    $('jobsFilter')
+      .querySelectorAll('[data-v]')
+      .forEach((b) => b.setAttribute('aria-checked', String(b === btn)));
     render();
   });
   $('jobsAdd').addEventListener('click', () => openJobSheet(null));
@@ -31,31 +37,32 @@ export function initJobs({ onGo }) {
   render();
 }
 
-export function showJob(jobId) {
+export function showJob(jobId: string | null): void {
   openJobId = jobId;
   render();
 }
 
-export function addJob() {
+export function addJob(): void {
   openJobSheet(null);
 }
 
-export function addCandidateTo(jobId) {
+export function addCandidateTo(jobId: string): void {
   openCandidateSheet(jobId, null);
 }
 
 function render() {
   const state = getState();
-  if (openJobId && !S.getJob(state, openJobId)) openJobId = null;
-  $('jobsListPane').hidden = Boolean(openJobId);
-  $('jobPane').hidden = !openJobId;
-  if (openJobId) renderJob(S.getJob(state, openJobId));
+  const job = S.getJob(state, openJobId);
+  if (!job) openJobId = null;
+  $('jobsListPane').hidden = Boolean(job);
+  $('jobPane').hidden = !job;
+  if (job) renderJob(job);
   else renderList(state);
 }
 
 // ---------- List ----------
 
-function renderList(state) {
+function renderList(state: S.State) {
   const jobs = S.jobsByStatus(state, filter);
   const list = $('jobsList');
   if (!jobs.length) {
@@ -89,7 +96,7 @@ function renderList(state) {
 
 // ---------- One job ----------
 
-function renderJob(job) {
+function renderJob(job: S.Job) {
   const state = getState();
   $('jobTitle').textContent = job.title;
   $('jobCompany').textContent = job.company;
@@ -150,13 +157,13 @@ function renderJob(job) {
   $('candAdd').onclick = () => openCandidateSheet(job.id, null);
 }
 
-function candidateCard(job, c) {
+function candidateCard(job: S.Job, c: S.Candidate) {
   const stage = el(
     'select',
     {
       class: 'stage-select',
       'aria-label': `Stage for ${c.name}`,
-      onchange: async (e) => commit(S.updateCandidate(getState(), c.id, { stage: e.target.value })),
+      onchange: async (e: Event) => commit(S.updateCandidate(getState(), c.id, { stage: (e.target as HTMLSelectElement).value })),
     },
     ...S.STAGES.map((s) => new Option(S.STAGE_LABELS[s], s)),
   );
@@ -210,17 +217,17 @@ function candidateCard(job, c) {
 
 // ---------- Job sheet (add / edit) ----------
 
-function openJobSheet(jobId) {
+function openJobSheet(jobId: string | null) {
   editingJobId = jobId;
   const job = jobId ? S.getJob(getState(), jobId) : null;
   $('jobSheetTitle').textContent = job ? 'Edit job' : 'Add a job';
-  $('jobFormTitle').value = job?.title || '';
-  $('jobFormCompany').value = job?.company || '';
-  $('jobFormDescription').value = job?.description || '';
+  input('jobFormTitle').value = job?.title || '';
+  input('jobFormCompany').value = job?.company || '';
+  textarea('jobFormDescription').value = job?.description || '';
   draftSkills = (job?.skills || []).map((s) => ({ ...s }));
   renderDraftSkills();
   openSheet('jobSheet');
-  $('jobFormTitle').focus();
+  input('jobFormTitle').focus();
 }
 
 function renderDraftSkills() {
@@ -253,9 +260,9 @@ function renderDraftSkills() {
 
 function wireJobSheet() {
   $('jobFormMakeSkills').addEventListener('click', async (e) => {
-    const description = $('jobFormDescription').value.trim();
+    const description = textarea('jobFormDescription').value.trim();
     if (!description) return toast('Paste the job description first.', { error: true });
-    await withBusy(e.currentTarget, 'Reading the job…', async () => {
+    await withBusy(e.currentTarget as HTMLButtonElement, 'Reading the job…', async () => {
       try {
         const { skills } = await api('/api/skills', { jobDescription: description });
         if (!skills?.length) return toast('No skills found. Try a fuller job description, or add skills yourself.', { error: true });
@@ -263,18 +270,18 @@ function wireJobSheet() {
         renderDraftSkills();
         toast('Checklist ready. Remove or add skills as you like.');
       } catch (err) {
-        toast(err.message, { error: true });
+        toast(errorMessage(err), { error: true });
       }
     });
   });
 
   const addSkill = () => {
-    const input = $('jobFormNewSkill');
-    const name = input.value.trim();
+    const field = input('jobFormNewSkill');
+    const name = field.value.trim();
     if (!name) return;
     if (draftSkills.some((s) => s.name.toLowerCase() === name.toLowerCase())) return toast('That skill is already on the list.');
     draftSkills.push({ name, why: '' });
-    input.value = '';
+    field.value = '';
     renderDraftSkills();
   };
   $('jobFormAddSkill').addEventListener('click', addSkill);
@@ -287,9 +294,9 @@ function wireJobSheet() {
 
   $('jobFormSave').addEventListener('click', async () => {
     const fields = {
-      title: $('jobFormTitle').value,
-      company: $('jobFormCompany').value,
-      description: $('jobFormDescription').value,
+      title: input('jobFormTitle').value,
+      company: input('jobFormCompany').value,
+      description: textarea('jobFormDescription').value,
       skills: draftSkills,
     };
     if (!fields.title.trim()) return toast('Add the job title.', { error: true });
@@ -302,31 +309,32 @@ function wireJobSheet() {
       await commit(state);
       toast('Job added. Now add your candidates.');
     }
-    $('jobSheet').close();
+    dialog('jobSheet').close();
   });
 }
 
 // ---------- Candidate sheet (add / edit) ----------
 
-function openCandidateSheet(jobId, candidateId) {
+function openCandidateSheet(jobId: string, candidateId: string | null) {
   editingCandidate = { jobId, id: candidateId };
   const c = candidateId ? S.getCandidate(getState(), candidateId) : null;
   const job = S.getJob(getState(), jobId);
   $('candSheetTitle').textContent = c ? `Edit ${c.name}` : 'Add a candidate';
   $('candSheetJob').textContent = S.jobLabel(job);
-  $('candFormName').value = c?.name || '';
-  $('candFormEmail').value = c?.email || '';
-  $('candFormProfile').value = c?.profileUrl || '';
-  $('candFormInterviewAt').value = c?.interviewAt || '';
-  $('candFormResume').value = c?.resumeText || '';
-  $('candFormFile').value = '';
+  input('candFormName').value = c?.name || '';
+  input('candFormEmail').value = c?.email || '';
+  input('candFormProfile').value = c?.profileUrl || '';
+  input('candFormInterviewAt').value = c?.interviewAt || '';
+  textarea('candFormResume').value = c?.resumeText || '';
+  input('candFormFile').value = '';
   openSheet('candidateSheet');
-  $('candFormName').focus();
+  input('candFormName').focus();
 }
 
 function wireCandidateSheet() {
-  $('candFormFile').addEventListener('change', async (e) => {
-    const file = e.target.files?.[0];
+  input('candFormFile').addEventListener('change', async (e) => {
+    const fileInput = e.target as HTMLInputElement;
+    const file = fileInput.files?.[0];
     if (!file) return;
     if (file.type !== 'application/pdf') return toast('Choose a PDF file, or paste the resume text.', { error: true });
     if (file.size > 8 * 1024 * 1024) return toast('That PDF is over 8 MB. Try a smaller file, or paste the text.', { error: true });
@@ -336,23 +344,23 @@ function wireCandidateSheet() {
     try {
       const pdfBase64 = await fileToBase64(file);
       const { text } = await api('/api/resume/parse', { pdfBase64 });
-      $('candFormResume').value = text;
+      textarea('candFormResume').value = text;
       toast('Resume read. Check the text, then save.');
     } catch (err) {
-      toast(err.message, { error: true });
+      toast(errorMessage(err), { error: true });
     } finally {
       label.classList.remove('busy');
-      e.target.value = '';
+      fileInput.value = '';
     }
   });
 
   $('candFormSave').addEventListener('click', async () => {
-    const fields = {
-      name: $('candFormName').value,
-      email: $('candFormEmail').value,
-      profileUrl: $('candFormProfile').value,
-      interviewAt: $('candFormInterviewAt').value,
-      resumeText: $('candFormResume').value,
+    const fields: S.CandidateFields & { name: string; profileUrl: string; interviewAt: string } = {
+      name: input('candFormName').value,
+      email: input('candFormEmail').value,
+      profileUrl: input('candFormProfile').value,
+      interviewAt: input('candFormInterviewAt').value,
+      resumeText: textarea('candFormResume').value,
     };
     if (!fields.name.trim()) return toast('Add the candidate’s name.', { error: true });
     if (fields.profileUrl.trim() && !S.cleanUrl(fields.profileUrl)) return toast('That profile link doesn’t look right. Use a web address.', { error: true });
@@ -366,9 +374,9 @@ function wireCandidateSheet() {
         await commit(state);
         toast('Candidate added.');
       }
-      $('candidateSheet').close();
+      dialog('candidateSheet').close();
     } catch (err) {
-      toast(err.message, { error: true });
+      toast(errorMessage(err), { error: true });
     }
   });
 }

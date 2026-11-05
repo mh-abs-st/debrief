@@ -1,0 +1,13 @@
+{
+  // Emits the extension: src/*.ts → dist/*.js. Imports are written with .ts so Node tests can load the
+  // sources directly; rewriteRelativeImportExtensions turns them into .js in the output.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "allowImportingTsExtensions": false,
+    "types": ["chrome"],
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts"]
+}

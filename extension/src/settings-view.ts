@@ -1,51 +1,59 @@
 // Settings sheet: server connection, transcription language, theme, how long candidate data is kept,
 // and deleting everything.
-import { $, toast, openSheet, confirmSheet } from './ui.js';
-import { getSettings, saveSettings, deleteAll, getState } from './data.js';
+import { $, toast, openSheet, confirmSheet, closestTarget } from './ui.ts';
+import { getSettings, saveSettings, deleteAll, getState, type Theme } from './data.ts';
 
-export function initSettings() {
+const input = (id: string) => $<HTMLInputElement>(id);
+const select = (id: string) => $<HTMLSelectElement>(id);
+const sheet = () => $<HTMLDialogElement>('settingsSheet');
+
+export function initSettings(): void {
   $('openSettings').addEventListener('click', open);
   $('setSave').addEventListener('click', save);
   $('setTheme').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-v]');
+    const btn = closestTarget(e, '[data-v]');
     if (!btn) return;
-    markTheme(btn.dataset.v);
+    markTheme(btn.dataset.v || 'system');
   });
   $('setDeleteAll').addEventListener('click', removeEverything);
 }
 
 function open() {
   const s = getSettings();
-  $('setServer').value = s.serverUrl;
-  $('setToken').value = s.appToken;
-  $('setLanguage').value = s.language;
-  $('setRetention').value = String(s.retentionDays);
+  input('setServer').value = s.serverUrl;
+  input('setToken').value = s.appToken;
+  select('setLanguage').value = s.language;
+  select('setRetention').value = String(s.retentionDays);
   markTheme(s.theme);
   openSheet('settingsSheet');
 }
 
-function markTheme(value) {
-  $('setTheme').querySelectorAll('[data-v]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.v === value)));
+function markTheme(value: string) {
+  $('setTheme')
+    .querySelectorAll<HTMLElement>('[data-v]')
+    .forEach((b) => b.setAttribute('aria-checked', String(b.dataset.v === value)));
 }
 
+const asTheme = (value: string | undefined): Theme => (value === 'light' || value === 'dark' ? value : 'system');
+
 async function save() {
-  const server = $('setServer').value.trim().replace(/\/+$/, '');
+  const server = input('setServer').value.trim().replace(/\/+$/, '');
   if (server && !/^https?:\/\//.test(server)) return toast('The server address should start with https:// (or http://localhost).', { error: true });
-  const theme = $('setTheme').querySelector('[aria-checked="true"]')?.dataset.v || 'system';
+  const theme = asTheme($('setTheme').querySelector<HTMLElement>('[aria-checked="true"]')?.dataset.v);
   await saveSettings({
     serverUrl: server,
-    appToken: $('setToken').value.trim(),
-    language: $('setLanguage').value,
-    retentionDays: Number($('setRetention').value) || 0,
+    appToken: input('setToken').value.trim(),
+    language: select('setLanguage').value,
+    retentionDays: Number(select('setRetention').value) || 0,
     theme,
   });
   applyTheme(theme);
-  $('settingsSheet').close();
+  sheet().close();
   toast('Settings saved.');
 }
 
 // Theme on <html>; also kept in localStorage so theme-init.js can set it before the page draws.
-export function applyTheme(theme) {
+export function applyTheme(theme: Theme): void {
   if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
   else delete document.documentElement.dataset.theme;
   try {
@@ -62,6 +70,6 @@ async function removeEverything() {
   });
   if (!ok) return;
   await deleteAll();
-  $('settingsSheet').close();
+  sheet().close();
   toast('All jobs, candidates and notes deleted.');
 }

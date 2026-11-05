@@ -1,6 +1,6 @@
-import { createApp } from './lib/app.js';
-import { makeClaude } from './lib/claude.js';
-import { makeGrantKey } from './lib/deepgram.js';
+import { createApp } from './lib/app.ts';
+import { makeClaude } from './lib/claude.ts';
+import { makeGrantKey } from './lib/deepgram.ts';
 
 const {
   PORT = '8789',

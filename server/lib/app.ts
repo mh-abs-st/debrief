@@ -1,9 +1,11 @@
 import http from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
-import { SKILLS_SYSTEM, FOLLOWUP_SYSTEM, parseJsonObject, cleanSkills, cleanFollowups, skillsUser, followupUser } from './prompts.js';
-import { PLAN_SYSTEM, planUser, cleanPlan } from './plan.js';
-import { RESUME_SYSTEM, MAX_PDF_BYTES, base64Bytes, resumeContent, resumeErrorMessage } from './resume.js';
-import { friendlyAiError, userMessage, MESSAGES } from './aierrors.js';
+import { SKILLS_SYSTEM, FOLLOWUP_SYSTEM, parseJsonObject, cleanSkills, cleanFollowups, skillsUser, followupUser, listOf, type Skill } from './prompts.ts';
+import { PLAN_SYSTEM, planUser, cleanPlan } from './plan.ts';
+import { RESUME_SYSTEM, MAX_PDF_BYTES, base64Bytes, resumeContent, resumeErrorMessage } from './resume.ts';
+import { friendlyAiError, userMessage, asErrorLike, MESSAGES } from './aierrors.ts';
+import type { Complete } from './claude.ts';
+import type { GrantKey } from './deepgram.ts';
 
 export const LIMITS = {
   jobDescription: 20_000,
@@ -17,8 +19,17 @@ export const LIMITS = {
   resumeBodyBytes: Math.ceil((MAX_PDF_BYTES * 4) / 3) + 4096,
 };
 
+export interface AppOptions {
+  complete: Complete;
+  grantKey?: GrantKey | null;
+  appToken?: string;
+  models: { fast: string; assist?: string };
+}
+
+type Body = Record<string, unknown>;
+
 // Only the Debrief extension may call the API from a browser (any other site is refused).
-function corsHeaders(origin) {
+function corsHeaders(origin: string | undefined): Record<string, string> {
   if (!origin || !origin.startsWith('chrome-extension://')) return {};
   return {
     'Access-Control-Allow-Origin': origin,
@@ -27,39 +38,41 @@ function corsHeaders(origin) {
   };
 }
 
-function send(res, status, body, origin) {
+function send(res: http.ServerResponse, status: number, body: unknown, origin: string | undefined): void {
   res.writeHead(status, { 'Content-Type': 'application/json', ...corsHeaders(origin) });
   res.end(JSON.stringify(body));
 }
 
 // Errors about the request itself (not the AI): `local` keeps them apart from provider errors with the same status.
-const requestError = (status, message) => Object.assign(new Error(message), { status, local: true });
+const requestError = (status: number, message: string) => Object.assign(new Error(message), { status, local: true });
 
-async function readJson(req, maxBytes = LIMITS.bodyBytes) {
+async function readJson(req: http.IncomingMessage, maxBytes = LIMITS.bodyBytes): Promise<Body> {
   let size = 0;
-  const chunks = [];
+  const chunks: Buffer[] = [];
   for await (const chunk of req) {
     size += chunk.length;
     if (size > maxBytes) throw requestError(413, 'That is too large to send.');
     chunks.push(chunk);
   }
+  let value: unknown;
   try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+    value = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
   } catch {
     throw requestError(400, MESSAGES.request);
   }
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Body) : {};
 }
 
-const text = (value, max) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
+const text = (value: unknown, max: number): string => (typeof value === 'string' ? value.trim().slice(0, max) : '');
 
-function tokenMatches(header, appToken) {
+function tokenMatches(header: string | undefined, appToken: string): boolean {
   const given = Buffer.from(String(header || ''));
   const wanted = Buffer.from(`Bearer ${appToken}`);
   return given.length === wanted.length && timingSafeEqual(given, wanted);
 }
 
-function skillsFrom(value) {
-  return (Array.isArray(value) ? value : [])
+function skillsFrom(value: unknown): Skill[] {
+  return listOf(value)
     .map((s) => ({ name: text(s?.name, 80), why: text(s?.why, 200) }))
     .filter((s) => s.name)
     .slice(0, 12);
@@ -68,12 +81,12 @@ function skillsFrom(value) {
 // createApp({ complete, grantKey, appToken, models }) → http.Server
 // complete({model, system, user, maxTokens}) → reply text. grantKey() → { key, expiresIn }. Both injected so
 // tests can fake the AI and Deepgram. models = { fast, assist }.
-export function createApp({ complete, grantKey, appToken = '', models }) {
+export function createApp({ complete, grantKey, appToken = '', models }: AppOptions): http.Server {
   const assist = models.assist || models.fast;
 
   return http.createServer(async (req, res) => {
     const origin = req.headers.origin;
-    const url = new URL(req.url, 'http://localhost');
+    const url = new URL(req.url || '/', 'http://localhost');
 
     if (req.method === 'OPTIONS') {
       res.writeHead(204, corsHeaders(origin));
@@ -132,11 +145,12 @@ export function createApp({ complete, grantKey, appToken = '', models }) {
         const pdfBase64 = typeof body.pdfBase64 === 'string' ? body.pdfBase64 : '';
         if (!pdfBase64) return send(res, 400, { error: 'missing_file', message: 'We didn’t receive a file. Please choose the PDF again.' }, origin);
         if (base64Bytes(pdfBase64) > MAX_PDF_BYTES) return send(res, 413, { error: 'too_large', message: 'That PDF is over 8 MB. Try a smaller file, or paste the resume text instead.' }, origin);
-        let reply;
+        let reply: string;
         try {
           reply = await complete({ model: models.fast, system: RESUME_SYSTEM, user: resumeContent(pdfBase64), maxTokens: 6000 });
         } catch (err) {
-          console.error('[resume] could not read PDF:', err?.status || '', err?.message || err);
+          const e = asErrorLike(err);
+          console.error('[resume] could not read PDF:', e.status || '', e.message || err);
           return send(res, 502, { error: 'resume_unreadable', message: resumeErrorMessage(err) }, origin);
         }
         const resumeText = reply.trim();
@@ -152,7 +166,8 @@ export function createApp({ complete, grantKey, appToken = '', models }) {
 
       return send(res, 404, { error: 'not_found' }, origin);
     } catch (err) {
-      if (err?.local) return send(res, err.status, { error: err.status === 413 ? 'too_large' : 'bad_request', message: err.message }, origin);
+      const e = asErrorLike(err);
+      if (e.local) return send(res, e.status ?? 400, { error: e.status === 413 ? 'too_large' : 'bad_request', message: e.message }, origin);
       const message = userMessage(friendlyAiError(err), MESSAGES.generic);
       return send(res, 502, { error: 'ai_error', message }, origin);
     }

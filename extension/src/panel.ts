@@ -1,15 +1,16 @@
 // Side panel entry: loads saved data, wires the four tabs (Live, Prepare, Jobs, Demo) and Settings.
-import { $, toast } from './ui.js';
-import { load, getSettings } from './data.js';
-import { initJobs, showJob, addJob, addCandidateTo } from './jobs-view.js';
-import { initPrepare, selectForPrepare } from './prepare-view.js';
-import { initLive, selectForLive, isListening } from './live-view.js';
-import { initDemo, stopDemo } from './demo-view.js';
-import { initSettings, applyTheme } from './settings-view.js';
+import { $, toast, closestTarget, type GoTo, type Tab } from './ui.ts';
+import { load, getSettings } from './data.ts';
+import { initJobs, showJob, addJob, addCandidateTo } from './jobs-view.ts';
+import { initPrepare, selectForPrepare } from './prepare-view.ts';
+import { initLive, selectForLive, isListening } from './live-view.ts';
+import { initDemo, stopDemo } from './demo-view.ts';
+import { initSettings, applyTheme } from './settings-view.ts';
 
-const TABS = ['live', 'prepare', 'jobs', 'demo'];
+const TABS: Tab[] = ['live', 'prepare', 'jobs', 'demo'];
+const isTab = (value: unknown): value is Tab => TABS.includes(value as Tab);
 
-function showTab(name) {
+function showTab(name: Tab) {
   for (const t of TABS) {
     $(`tab-${t}`).setAttribute('aria-selected', String(t === name));
     $(`view-${t}`).hidden = t !== name;
@@ -21,7 +22,7 @@ function showTab(name) {
 }
 
 // Moves between tabs with a job or candidate already chosen (e.g. Jobs → "Prepare" on a candidate).
-function goTo(tab, { jobId, candidateId, addCandidate } = {}) {
+const goTo: GoTo = (tab, { jobId, candidateId, addCandidate } = {}) => {
   if (tab === 'jobs') {
     if (jobId) showJob(jobId);
     else showJob(null);
@@ -33,7 +34,7 @@ function goTo(tab, { jobId, candidateId, addCandidate } = {}) {
   if (tab === 'prepare') selectForPrepare(jobId, candidateId);
   if (tab === 'live') selectForLive(jobId, candidateId);
   showTab(tab);
-}
+};
 
 async function main() {
   const { removed } = await load();
@@ -46,8 +47,8 @@ async function main() {
   initDemo();
 
   $('tabs').addEventListener('click', (e) => {
-    const btn = e.target.closest('[role="tab"]');
-    if (btn) showTab(btn.dataset.tab);
+    const tab = closestTarget(e, '[role="tab"]')?.dataset.tab;
+    if (isTab(tab)) showTab(tab);
   });
   // Arrow keys move between tabs, as for any tab list.
   $('tabs').addEventListener('keydown', (e) => {
@@ -58,11 +59,11 @@ async function main() {
     $(`tab-${next}`).focus();
   });
 
-  let first = 'live';
+  let first: string | null = 'live';
   try {
-    first = localStorage.getItem('debriefTab') || 'live';
+    first = localStorage.getItem('debriefTab');
   } catch {}
-  showTab(TABS.includes(first) ? first : 'live');
+  showTab(isTab(first) ? first : 'live');
 
   if (removed) toast(`${removed} candidate${removed === 1 ? '' : 's'} removed: not changed for longer than your Settings allow.`);
   if (!getSettings().appToken) toast('Add the server address and app token in Settings to use AI features.');

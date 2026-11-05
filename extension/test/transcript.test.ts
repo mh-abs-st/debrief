@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listenUrl, emptyTranscript, applyMessage, transcriptText } from '../transcript.js';
+import { listenUrl, emptyTranscript, applyMessage, transcriptText } from '../src/transcript.ts';
 
-const result = (transcript, isFinal) => ({ type: 'Results', is_final: isFinal, channel: { alternatives: [{ transcript }] } });
+const result = (transcript: string, isFinal: boolean) => ({ type: 'Results', is_final: isFinal, channel: { alternatives: [{ transcript }] } });
 
 test('listen URL uses nova-3 and keeps call audio out of training', () => {
   const url = new URL(listenUrl({ language: 'en' }));
@@ -39,7 +39,7 @@ test('copied text includes finals and any pending interim line', () => {
 });
 
 test('recent text joins only the last few final lines', async () => {
-  const { recentText } = await import('../transcript.js');
+  const { recentText } = await import('../src/transcript.ts');
   let t = emptyTranscript();
   for (const s of ['one', 'two', 'three']) t = applyMessage(t, result(s, true));
   t = applyMessage(t, result('pending', false));

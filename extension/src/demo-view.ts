@@ -1,12 +1,12 @@
 // Demo tab: plays a scripted interview so people can see Debrief without a call, an account or a job.
 // Uses only demo-script.js. It never reads or changes your real jobs, candidates or notes.
-import { $, el } from './ui.js';
-import { DEMO_JOB, DEMO_CANDIDATE, DEMO_PLAN, DEMO_LENGTH_MS, demoAt } from './demo-script.js';
+import { $, el } from './ui.ts';
+import { DEMO_JOB, DEMO_CANDIDATE, DEMO_PLAN, DEMO_LENGTH_MS, demoAt, type DemoFrame } from './demo-script.ts';
 
-let timer = null;
+let timer: ReturnType<typeof setInterval> | undefined;
 let startedAt = 0;
 
-export function initDemo() {
+export function initDemo(): void {
   $('demoJob').textContent = `${DEMO_JOB.title} · ${DEMO_JOB.company}`;
   $('demoName').textContent = DEMO_CANDIDATE.name;
   $('demoPlay').addEventListener('click', play);
@@ -15,9 +15,9 @@ export function initDemo() {
 }
 
 // Stops the demo when you leave the tab.
-export function stopDemo() {
+export function stopDemo(): void {
   clearInterval(timer);
-  timer = null;
+  timer = undefined;
   $('demoPlay').textContent = 'Play the demo';
 }
 
@@ -34,12 +34,12 @@ function tick() {
   draw(state);
   if (state.done) {
     clearInterval(timer);
-    timer = null;
+    timer = undefined;
     $('demoPlay').textContent = 'Play again';
   }
 }
 
-function draw({ lines, covered, suggestions }) {
+function draw({ lines, covered, suggestions }: DemoFrame) {
   const total = DEMO_JOB.skills.length;
   $('demoCoverage').textContent = `${covered.size} of ${total} covered`;
   $('demoCoverBar').style.width = `${Math.round((covered.size / total) * 100)}%`;

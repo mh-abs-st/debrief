@@ -23,13 +23,15 @@ A Chrome side-panel assistant for interviewers at small companies and agencies. 
 
 ## Structure
 
-- `extension/`: Chrome extension (Manifest V3), plain ES modules, no build step.
-  - `panel.html|css|js`: the side panel; `panel.js` wires the tabs.
-  - Views: `live-view.js`, `prepare-view.js`, `jobs-view.js`, `demo-view.js`, `settings-view.js`. Shared: `picker.js` (job and candidate selects), `ui.js` (safe DOM helpers, sheets, toasts), `api.js` (server calls), `data.js` (saving to `chrome.storage.local`, settings).
-  - Pure logic, tested in Node: `store.js` (jobs, candidates, interviews, retention, Markdown notes), `transcript.js` (Deepgram URL and transcript merging), `demo-script.js`.
-  - `capture.js`: records the call tab and streams audio straight to Deepgram.
-- `server/`: Node backend (Node 20+). No npm dependencies: the built-in HTTP server and `fetch`.
-  - `lib/app.js`: routes, auth, CORS. `lib/prompts.js`: skills and follow-up prompts. `lib/plan.js`: the interview plan prompt and output cleaning. `lib/resume.js`: reading PDF resumes. `lib/claude.js`: Anthropic client. `lib/deepgram.js`: short-lived speech keys. `lib/aierrors.js`: copied from Offro for friendly errors.
+Everything is TypeScript. The server and the tests run the `.ts` files directly (Node 22.18+ strips the types); only the extension has a build step, because Chrome can't load `.ts`.
+
+- `extension/`: Chrome extension (Manifest V3). Sources in `extension/src/`; `npm run build` compiles them with `tsc` into `extension/dist/`, the folder you load in Chrome.
+  - `panel.html|css|ts`: the side panel; `panel.ts` wires the tabs.
+  - Views: `live-view.ts`, `prepare-view.ts`, `jobs-view.ts`, `demo-view.ts`, `settings-view.ts`. Shared: `picker.ts` (job and candidate selects), `ui.ts` (safe DOM helpers, sheets, toasts), `api.ts` (server calls, typed per route), `data.ts` (saving to `chrome.storage.local`, settings).
+  - Pure logic, tested in Node: `store.ts` (data types; jobs, candidates, interviews, retention, Markdown notes), `transcript.ts` (Deepgram URL and transcript merging), `demo-script.ts`.
+  - `capture.ts`: records the call tab and streams audio straight to Deepgram.
+- `server/`: Node backend (Node 22.18+). No runtime npm dependencies: the built-in HTTP server and `fetch`. TypeScript is a dev dependency, for type checking only.
+  - `lib/app.ts`: routes, auth, CORS. `lib/prompts.ts`: skills and follow-up prompts. `lib/plan.ts`: the interview plan prompt and output cleaning. `lib/resume.ts`: reading PDF resumes. `lib/claude.ts`: Anthropic client. `lib/deepgram.ts`: short-lived speech keys. `lib/aierrors.ts`: adapted from Offro for friendly errors.
 - `docs/`: `scope.md` (MVP, compliance, next steps) and `DECISIONS.md` (why things are the way they are).
 
 ## Run it locally
@@ -38,18 +40,27 @@ A Chrome side-panel assistant for interviewers at small companies and agencies. 
 
    ```bash
    cd server
+   npm install            # dev tools only (TypeScript), for npm run typecheck
    cp .env.example .env   # fill in ANTHROPIC_API_KEY, DEEPGRAM_API_KEY and DEBRIEF_APP_TOKEN
-   node --env-file=.env index.js
+   npm start              # node --env-file=.env index.ts
    ```
 
-2. Tests (no network, API keys or Chrome needed):
+2. Tests and type checks (no network, API keys or Chrome needed):
 
    ```bash
-   cd server && npm test
-   cd ../extension && npm test
+   cd server && npm test && npm run typecheck
+   cd ../extension && npm test && npm run typecheck
    ```
 
-3. Extension: open `chrome://extensions`, turn on Developer mode, choose "Load unpacked", and select the `extension/` folder. Open Settings in the side panel and paste the same `DEBRIEF_APP_TOKEN`.
+3. Extension:
+
+   ```bash
+   cd extension
+   npm install
+   npm run build          # or npm run watch while you work
+   ```
+
+   Open `chrome://extensions`, turn on Developer mode, choose "Load unpacked", and select the `extension/dist/` folder. After each rebuild, press the reload icon on the Debrief card. Open Settings in the side panel and paste the same `DEBRIEF_APP_TOKEN`.
 
 ## API
 

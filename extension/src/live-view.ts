@@ -1,19 +1,23 @@
 // Live tab: the interview itself. Checklist and notes for the chosen candidate, the live transcript,
 // follow-up suggestions and the questions you planned in Prepare.
-import { $, el, toast, confirmSheet, fillSelect, withBusy, formatDate } from './ui.js';
-import { getState, getSettings, commit, commitSoon, subscribe } from './data.js';
-import { api } from './api.js';
-import { createPicker } from './picker.js';
-import { startListening } from './capture.js';
-import { emptyTranscript, recentText, transcriptText } from './transcript.js';
-import * as S from './store.js';
+import { $, el, toast, confirmSheet, fillSelect, withBusy, formatDate, errorMessage, type GoTo } from './ui.ts';
+import { getState, getSettings, commit, commitSoon, subscribe } from './data.ts';
+import { api } from './api.ts';
+import { createPicker, type Picker } from './picker.ts';
+import { startListening, type Listening } from './capture.ts';
+import { emptyTranscript, recentText, transcriptText } from './transcript.ts';
+import * as S from './store.ts';
 
-let picker = null;
-let goTo = () => {};
-let listening = null; // { stop() } while the call is being transcribed
+let picker: Picker;
+let goTo: GoTo = () => {};
+let listening: Listening | null = null; // set while the call is being transcribed
 let transcript = emptyTranscript(); // kept in this panel only, never saved
 
-export function initLive({ onGo }) {
+const input = (id: string) => $<HTMLInputElement>(id);
+const textarea = (id: string) => $<HTMLTextAreaElement>(id);
+const button = (id: string) => $<HTMLButtonElement>(id);
+
+export function initLive({ onGo }: { onGo: GoTo }): void {
   goTo = onGo;
   picker = createPicker($('livePicker'), {
     onChange: () => {
@@ -39,12 +43,12 @@ export function initLive({ onGo }) {
   $('liveUseTranscript').addEventListener('click', () => {
     const text = recentText(transcript);
     if (!text) return toast('Nothing in the transcript yet.', { error: true });
-    $('liveAnswer').value = text;
+    textarea('liveAnswer').value = text;
   });
-  $('liveSuggest').addEventListener('click', (e) => suggest(e.currentTarget));
-  $('liveGeneral').addEventListener('input', (e) => {
+  $('liveSuggest').addEventListener('click', (e) => suggest(e.currentTarget as HTMLButtonElement));
+  textarea('liveGeneral').addEventListener('input', (e) => {
     const iv = currentInterview();
-    if (iv) commitSoon(S.setGeneralNotes(getState(), iv.id, e.target.value));
+    if (iv) commitSoon(S.setGeneralNotes(getState(), iv.id, (e.target as HTMLTextAreaElement).value));
   });
   $('liveCopy').addEventListener('click', () => {
     const iv = currentInterview();
@@ -66,15 +70,15 @@ export function initLive({ onGo }) {
   renderTranscript();
 }
 
-export function selectForLive(jobId, candidateId) {
+export function selectForLive(jobId: string | null | undefined, candidateId: string | null | undefined): void {
   stopListening();
   picker.set(jobId, candidateId);
   render();
 }
 
-export const isListening = () => Boolean(listening);
+export const isListening = (): boolean => Boolean(listening);
 
-function currentInterview() {
+function currentInterview(): S.Interview | null {
   const { candidateId } = picker.get();
   return candidateId ? S.openInterview(getState(), candidateId) : null;
 }
@@ -101,8 +105,9 @@ function render() {
   const iv = S.openInterview(state, cand.id);
   $('liveName').textContent = cand.name;
   $('liveMeta').textContent = [S.STAGE_LABELS[cand.stage], cand.interviewAt ? formatDate(cand.interviewAt) : ''].filter(Boolean).join(' · ');
-  $('liveProfile').hidden = !cand.profileUrl;
-  if (cand.profileUrl) $('liveProfile').href = cand.profileUrl;
+  const profile = $<HTMLAnchorElement>('liveProfile');
+  profile.hidden = !cand.profileUrl;
+  if (cand.profileUrl) profile.href = cand.profileUrl;
 
   $('liveStartBox').hidden = Boolean(iv);
   $('liveRun').hidden = !iv;
@@ -110,36 +115,37 @@ function render() {
 
   if (iv) {
     renderChecklist(iv);
-    fillSelect($('liveSkill'), iv.skills.map((s, i) => ({ value: String(i), label: s.name })), $('liveSkill').value);
+    const skillSelect = $<HTMLSelectElement>('liveSkill');
+    fillSelect(skillSelect, iv.skills.map((s, i) => ({ value: String(i), label: s.name })), skillSelect.value);
     $('liveFollowups').hidden = !iv.skills.length;
-    if (document.activeElement !== $('liveGeneral')) $('liveGeneral').value = iv.generalNotes;
+    if (document.activeElement !== $('liveGeneral')) textarea('liveGeneral').value = iv.generalNotes;
   }
   renderPlan(cand);
   renderPast(cand);
   updateListenButtons();
 }
 
-function renderChecklist(iv) {
+function renderChecklist(iv: S.Interview) {
   const { covered, total } = S.coverage(iv);
   $('liveCoverage').textContent = total ? `${covered} of ${total} covered` : '';
   $('liveCoverBar').style.width = total ? `${Math.round((covered / total) * 100)}%` : '0%';
 
   // Don't rebuild while you're typing in one of the notes boxes (you'd lose your place).
-  if ($('liveSkills').contains(document.activeElement) && document.activeElement.tagName === 'TEXTAREA') return;
+  if ($('liveSkills').contains(document.activeElement) && document.activeElement?.tagName === 'TEXTAREA') return;
 
   $('liveSkills').replaceChildren(
     ...iv.skills.map((s, i) => {
       const box = el('input', {
         type: 'checkbox',
         checked: s.covered,
-        onchange: async (e) => commit(S.setSkillCovered(getState(), iv.id, i, e.target.checked)),
+        onchange: async (e: Event) => commit(S.setSkillCovered(getState(), iv.id, i, (e.target as HTMLInputElement).checked)),
       });
       const notes = el('textarea', {
         rows: 2,
         placeholder: 'Your notes',
         'aria-label': `Notes for ${s.name}`,
         value: s.notes,
-        oninput: (e) => commitSoon(S.setSkillNotes(getState(), iv.id, i, e.target.value)),
+        oninput: (e: Event) => commitSoon(S.setSkillNotes(getState(), iv.id, i, (e.target as HTMLTextAreaElement).value)),
       });
       return el(
         'li',
@@ -153,19 +159,19 @@ function renderChecklist(iv) {
 }
 
 // The questions planned in Prepare, collapsed by default so they don't push the checklist down.
-function renderPlan(cand) {
+function renderPlan(cand: S.Candidate) {
   const box = $('livePlan');
   const plan = cand.plan;
   box.hidden = !plan;
   if (!plan) return;
-  const items = [];
+  const items: HTMLLIElement[] = [];
   if (plan.opening) items.push(el('li', {}, el('span', { class: 'tag' }, 'Start'), plan.opening));
   for (const s of plan.skills) for (const q of s.questions) items.push(el('li', {}, el('span', { class: 'tag' }, s.name), q));
   for (const v of plan.verify || []) items.push(el('li', {}, el('span', { class: 'tag' }, 'Check'), v.question));
   $('livePlanList').replaceChildren(...items);
 }
 
-function renderPast(cand) {
+function renderPast(cand: S.Candidate) {
   const past = S.interviewsFor(getState(), cand.id).filter((i) => i.endedAt);
   $('livePast').hidden = !past.length;
   $('livePastList').replaceChildren(
@@ -185,10 +191,10 @@ function renderPast(cand) {
 
 function updateListenButtons() {
   const on = Boolean(listening);
-  $('liveListen').hidden = on;
-  $('liveStop').hidden = !on;
-  $('liveListen').disabled = !$('liveConsent').checked;
-  $('liveConsent').disabled = on;
+  button('liveListen').hidden = on;
+  button('liveStop').hidden = !on;
+  button('liveListen').disabled = !input('liveConsent').checked;
+  input('liveConsent').disabled = on;
   $('liveDot').classList.toggle('on', on);
   $('liveState').textContent = on ? 'Listening' : 'Not listening';
 }
@@ -204,7 +210,7 @@ function renderTranscript() {
 }
 
 async function start() {
-  if (!$('liveConsent').checked) return toast('Tick the box first: the candidate must know the call is transcribed.', { error: true });
+  if (!input('liveConsent').checked) return toast('Tick the box first: the candidate must know the call is transcribed.', { error: true });
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   if (!tab?.id || !/^https:/.test(tab.url || '')) return toast('Open the call in a browser tab first (Google Meet, Zoom or Teams on the web).', { error: true });
   toast('Starting…');
@@ -227,7 +233,7 @@ async function start() {
     });
   } catch (err) {
     listening = null;
-    toast(err.message || 'We couldn’t start listening. Please try again.', { error: true });
+    toast(errorMessage(err, 'We couldn’t start listening. Please try again.'), { error: true });
   }
   updateListenButtons();
 }
@@ -241,21 +247,21 @@ function stopListening() {
 
 // ---------- Follow-ups ----------
 
-async function suggest(button) {
+async function suggest(btn: HTMLButtonElement) {
   const iv = currentInterview();
   if (!iv) return;
-  const skill = iv.skills[Number($('liveSkill').value)];
-  const answer = $('liveAnswer').value.trim();
+  const skill = iv.skills[Number($<HTMLSelectElement>('liveSkill').value)];
+  const answer = textarea('liveAnswer').value.trim();
   if (!skill) return;
   if (!answer) return toast('Add the candidate’s answer first, or use the transcript.', { error: true });
-  await withBusy(button, 'Thinking…', async () => {
+  await withBusy(btn, 'Thinking…', async () => {
     try {
-      const { questions } = await api('/api/followups', { skill: skill.name, question: $('liveQuestion').value.trim(), answer });
+      const { questions } = await api('/api/followups', { skill: skill.name, question: input('liveQuestion').value.trim(), answer });
       $('liveSuggestions').replaceChildren(
         ...(questions.length ? questions.map((q) => el('li', {}, q)) : [el('li', { class: 'empty' }, 'No follow-ups to suggest for this answer.')]),
       );
     } catch (err) {
-      toast(err.message, { error: true });
+      toast(errorMessage(err), { error: true });
     }
   });
 }
@@ -278,15 +284,15 @@ async function endInterview() {
   await commit(S.endInterview(getState(), iv.id));
   transcript = emptyTranscript();
   renderTranscript();
-  $('liveConsent').checked = false;
+  input('liveConsent').checked = false;
   $('liveSuggestions').replaceChildren();
-  $('liveAnswer').value = '';
-  $('liveQuestion').value = '';
+  textarea('liveAnswer').value = '';
+  input('liveQuestion').value = '';
   updateListenButtons();
   toast('Interview ended. Notes saved on this computer.');
 }
 
-async function copy(text, done) {
+async function copy(text: string, done: string) {
   try {
     await navigator.clipboard.writeText(text);
     toast(done);

@@ -1,7 +1,25 @@
 // The Demo tab's scripted interview. Made-up people and company; no AI, no server, no real data.
 // Pure data plus one function, so it can be tested in Node.
+import type { Plan, Skill } from './store.ts';
 
-export const DEMO_JOB = {
+// at: milliseconds from the start. who: 'you' (the interviewer) or 'them' (the candidate).
+// cover: index of a skill this line covers. suggest: follow-ups that appear after this line.
+export interface DemoStep {
+  at: number;
+  who: 'you' | 'them';
+  text: string;
+  cover?: number;
+  suggest?: string[];
+}
+
+export interface DemoFrame {
+  lines: Array<Pick<DemoStep, 'who' | 'text'>>;
+  covered: Set<number>;
+  suggestions: string[];
+  done: boolean;
+}
+
+export const DEMO_JOB: { title: string; company: string; skills: Skill[] } = {
   title: 'Backend Engineer',
   company: 'Northwind (example)',
   skills: [
@@ -14,7 +32,7 @@ export const DEMO_JOB = {
 
 export const DEMO_CANDIDATE = { name: 'Sam Rivera (example)' };
 
-export const DEMO_PLAN = {
+export const DEMO_PLAN: Plan = {
   opening: 'What have you been working on most recently?',
   skills: [
     { name: 'Node.js APIs', resumeShows: 'Built the orders API at a delivery startup (Node, Express).', askAbout: 'Their own part, and how they handled load.', questions: ['Walk me through a slow endpoint you fixed. What did you change?'] },
@@ -25,9 +43,7 @@ export const DEMO_PLAN = {
   verify: [{ claim: 'Cut query times by 60%', question: 'What was the before and after, and how did you measure it?' }],
 };
 
-// at: milliseconds from the start. who: 'you' (the interviewer) or 'them' (the candidate).
-// cover: index of a skill this line covers. suggest: follow-ups that appear after this line.
-export const DEMO_STEPS = [
+export const DEMO_STEPS: DemoStep[] = [
   { at: 0, who: 'you', text: 'Thanks for joining, Sam. Before we start: this call is transcribed for my notes. Is that OK?' },
   { at: 2500, who: 'them', text: 'Sure, that’s fine.' },
   { at: 4500, who: 'you', text: 'What have you been working on most recently?' },
@@ -43,14 +59,14 @@ export const DEMO_STEPS = [
 export const DEMO_LENGTH_MS = DEMO_STEPS[DEMO_STEPS.length - 1].at + 3000;
 
 // What the demo shows `elapsed` ms after it started.
-export function demoAt(elapsed, steps = DEMO_STEPS) {
+export function demoAt(elapsed: number, steps: DemoStep[] = DEMO_STEPS): DemoFrame {
   const shown = steps.filter((s) => s.at <= elapsed);
-  const covered = new Set(shown.filter((s) => Number.isInteger(s.cover)).map((s) => s.cover));
+  const covered = new Set(shown.flatMap((s) => (s.cover !== undefined && Number.isInteger(s.cover) ? [s.cover] : [])));
   const lastSuggest = [...shown].reverse().find((s) => s.suggest);
   return {
     lines: shown.map(({ who, text }) => ({ who, text })),
     covered,
-    suggestions: lastSuggest ? lastSuggest.suggest : [],
+    suggestions: lastSuggest?.suggest || [],
     done: elapsed >= (steps.length ? steps[steps.length - 1].at + 3000 : 0),
   };
 }

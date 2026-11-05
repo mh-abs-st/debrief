@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { demoAt, DEMO_STEPS, DEMO_JOB, DEMO_PLAN, DEMO_LENGTH_MS } from '../demo-script.js';
+import { demoAt, DEMO_STEPS, DEMO_JOB, DEMO_PLAN, DEMO_LENGTH_MS } from '../src/demo-script.ts';
 
 test('nothing is covered before the candidate talks', () => {
   const s = demoAt(0);

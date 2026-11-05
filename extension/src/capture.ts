@@ -1,37 +1,56 @@
 // Browser side of live transcription: the call tab's audio goes straight from this browser to Deepgram.
 // Runs in the side panel. The panel must stay open during the call.
-import { listenUrl, applyMessage, emptyTranscript } from './transcript.js';
+import { listenUrl, applyMessage, emptyTranscript, type DeepgramMessage, type Transcript } from './transcript.ts';
 
 const KEEP_ALIVE_MS = 8000;
 const CHUNK_MS = 250;
 
+export interface ListenOptions {
+  tabId: number;
+  language?: string;
+  getKey: () => Promise<{ key: string }>;
+  onTranscript: (transcript: Transcript) => void;
+  onStatus: (text: string, isError: boolean) => void;
+}
+
+export interface Listening {
+  stop(): void;
+}
+
+// Chrome's tab-audio constraint. It isn't in the standard MediaTrackConstraints, so it is typed here.
+interface TabAudioConstraints {
+  audio: { mandatory: { chromeMediaSource: 'tab'; chromeMediaSourceId: string } };
+  video: false;
+}
+
 // Starts listening to one tab. Calls onTranscript(transcript) as lines arrive and onStatus(text, isError).
 // Returns { stop() }. Throws a user-facing Error if it can't start.
-export async function startListening({ tabId, language = 'en', getKey, onTranscript, onStatus }) {
+export async function startListening({ tabId, language = 'en', getKey, onTranscript, onStatus }: ListenOptions): Promise<Listening> {
   // 1. Get the tab's audio. The tab goes quiet for the user, so we also play it back below.
   // Chrome only allows this after the Debrief icon was clicked on that tab (it grants access to the tab).
-  let streamId;
+  let streamId: string;
   try {
     streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
   } catch {
     throw new Error('Click the Debrief icon in Chrome’s toolbar while you’re on the call tab, then press Start listening again.');
   }
-  const tabStream = await navigator.mediaDevices.getUserMedia({
+  const constraints: TabAudioConstraints = {
     audio: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: streamId } },
     video: false,
-  });
+  };
+  const tabStream = await navigator.mediaDevices.getUserMedia(constraints as MediaStreamConstraints);
 
   const ctx = new AudioContext();
   ctx.createMediaStreamSource(tabStream).connect(ctx.destination);
 
   // 2. Get a short-lived key just before connecting, because it expires quickly.
-  let key;
+  let key: string;
   try {
     ({ key } = await getKey());
   } catch (err) {
     tabStream.getTracks().forEach((t) => t.stop());
     await ctx.close();
-    throw new Error(err?.message || 'We couldn’t start listening. Please try again.');
+    throw new Error((err instanceof Error && err.message) || 'We couldn’t start listening. Please try again.');
   }
 
   // 3. Connect to Deepgram. The key goes in the subprotocol, as Deepgram's browser auth expects.
@@ -39,12 +58,12 @@ export async function startListening({ tabId, language = 'en', getKey, onTranscr
   ws.binaryType = 'arraybuffer';
 
   let transcript = emptyTranscript();
-  let recorder = null;
-  let keepAlive = null;
+  let recorder: MediaRecorder | null = null;
+  let keepAlive: ReturnType<typeof setInterval> | null = null;
   let stopped = false;
 
   // Chunks are pieces of one audio file: send them in order, or words are lost.
-  let queue = Promise.resolve();
+  let queue: Promise<void> = Promise.resolve();
   const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
 
   function cleanup() {
@@ -73,8 +92,8 @@ export async function startListening({ tabId, language = 'en', getKey, onTranscr
     onStatus('Listening', false);
   };
 
-  ws.onmessage = (event) => {
-    let msg;
+  ws.onmessage = (event: MessageEvent) => {
+    let msg: DeepgramMessage;
     try {
       msg = JSON.parse(event.data);
     } catch {
