@@ -3,7 +3,7 @@ import { makeClaude } from './lib/claude.js';
 import { makeGrantKey } from './lib/deepgram.js';
 
 const {
-  PORT = '8787',
+  PORT = '8789',
   ANTHROPIC_API_KEY = '',
   DEBRIEF_APP_TOKEN = '',
   FAST_MODEL = 'claude-haiku-5-5',

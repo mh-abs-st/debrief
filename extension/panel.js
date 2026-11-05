@@ -5,7 +5,7 @@ import { startInterview, setCovered, setNotes, coverage, toMarkdown } from './no
 import { startListening } from './capture.js';
 
 const $ = (id) => document.getElementById(id);
-const DEFAULTS = { serverUrl: 'http://localhost:8787', appToken: '' };
+const DEFAULTS = { serverUrl: 'http://localhost:8789', appToken: '' };
 const STORE_KEY = 'interview';
 
 let state = null; // { skills: [{ name, why, covered, notes }] }
