@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Debrief</title>
+    <script src="theme-init.js"></script>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <symbol id="i-gear" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z"/><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/></symbol>
+      <symbol id="i-left" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m15 18-6-6 6-6"/></symbol>
+    </svg>
+
+    <div class="app">
+      <header class="bar">
+        <div class="tabs" id="tabs" role="tablist" aria-label="Sections">
+          <button role="tab" id="tab-interview" data-tab="interview" aria-controls="view-person" aria-selected="true" type="button">Interview</button>
+          <button role="tab" id="tab-upcoming" data-tab="upcoming" aria-controls="view-upcoming" aria-selected="false" type="button">Upcoming</button>
+          <button role="tab" id="tab-jobs" data-tab="jobs" aria-controls="view-jobs" aria-selected="false" type="button">Jobs</button>
+        </div>
+        <button class="icon-btn" id="openSettings" type="button" title="Settings" aria-label="Settings"><svg><use href="#i-gear"/></svg></button>
+      </header>
+
+      <!-- ============ Upcoming: who you're interviewing next, across all open jobs ============ -->
+      <main class="view" id="view-upcoming" role="tabpanel" aria-labelledby="tab-upcoming" hidden>
+        <section class="empty-state" id="upEmpty" hidden></section>
+        <div class="stack" id="upGroups"></div>
+      </main>
+
+      <!-- ============ Jobs ============ -->
+      <main class="view" id="view-jobs" role="tabpanel" aria-labelledby="tab-jobs" hidden>
+        <div class="stack" id="jobsListPane">
+          <div class="seg" id="jobsFilter" role="radiogroup" aria-label="Show">
+            <button role="radio" data-v="open" aria-checked="true" type="button">Open</button>
+            <button role="radio" data-v="closed" aria-checked="false" type="button">Closed</button>
+            <button role="radio" data-v="all" aria-checked="false" type="button">All</button>
+          </div>
+          <ul class="cards" id="jobsList"></ul>
+          <button class="primary-btn wide" id="jobsAdd" type="button">＋ Add a job</button>
+          <p class="help">Jobs, candidates and notes are saved on this computer only.</p>
+        </div>
+
+        <div class="stack" id="jobPane" hidden>
+          <button class="link-btn back" id="jobBack" type="button"><svg><use href="#i-left"/></svg>All jobs</button>
+          <div>
+            <h2 id="jobTitle"></h2>
+            <p class="muted" id="jobCompany"></p>
+          </div>
+          <div class="row" id="jobActions"></div>
+
+          <section class="card">
+            <h3>Skills checklist</h3>
+            <ul class="skill-list" id="jobSkills"></ul>
+          </section>
+
+          <section class="card">
+            <div class="section-head">
+              <h3>Candidates <span class="muted" id="candCount"></span></h3>
+              <button class="soft-btn small" id="candAdd" type="button">＋ Add</button>
+            </div>
+            <ul class="cards" id="candList"></ul>
+          </section>
+        </div>
+      </main>
+
+      <!-- ============ One candidate: Plan, Interview, Notes ============ -->
+      <!-- The Interview tab shows the current candidate here; Upcoming and Jobs open others here too (with Back). -->
+      <main class="view" id="view-person" role="tabpanel" aria-labelledby="tab-interview">
+        <section class="empty-state" id="nowEmpty" hidden></section>
+        <div class="stack" id="personPage">
+        <button class="link-btn back" id="personBack" type="button"><svg><use href="#i-left"/></svg><span id="personBackLabel">Upcoming</span></button>
+        <div class="person">
+          <div>
+            <h2 id="personName"></h2>
+            <p class="muted" id="personMeta"></p>
+          </div>
+          <div class="row">
+            <a class="link-btn" id="personProfile" target="_blank" rel="noopener noreferrer" hidden>Profile ↗</a>
+            <button class="link-btn" id="personEdit" type="button">Edit</button>
+          </div>
+        </div>
+        <div class="seg" id="personSections" role="tablist" aria-label="Candidate">
+          <button role="tab" id="sec-plan" data-section="plan" aria-controls="section-plan" aria-selected="true" type="button">Plan</button>
+          <button role="tab" id="sec-interview" data-section="interview" aria-controls="section-interview" aria-selected="false" type="button">Interview</button>
+          <button role="tab" id="sec-notes" data-section="notes" aria-controls="section-notes" aria-selected="false" type="button">Notes</button>
+        </div>
+
+        <!-- Plan -->
+        <div class="stack" id="section-plan" role="tabpanel" aria-labelledby="sec-plan">
+          <section class="card">
+            <h3>Interview plan</h3>
+            <p class="help">Reads the resume against the job’s skills and suggests what to ask. No score: you decide after the interview.</p>
+            <ul class="facts" id="prepInputs"></ul>
+            <p class="warn" id="prepMissing" hidden></p>
+            <button class="primary-btn" id="prepMake" type="button">Make interview plan</button>
+          </section>
+          <section class="card plan" id="prepPlan" hidden></section>
+        </div>
+
+        <!-- Interview -->
+        <div class="stack" id="section-interview" role="tabpanel" aria-labelledby="sec-interview" hidden>
+          <!-- Shown instead of the interview when you're looking at someone who isn't the current candidate. -->
+          <section class="card" id="liveSwitchBox" hidden></section>
+          <div class="stack" id="liveArea">
+          <section class="card" id="liveStartBox">
+            <p>Start when the call begins. You’ll get the job’s checklist, a notes box for each skill, and the live transcript.</p>
+            <p class="warn" id="liveNoSkills" hidden>This job has no skills checklist yet. You can still take notes, or add skills in Jobs first.</p>
+            <button class="primary-btn" id="liveStart" type="button">Start interview</button>
+          </section>
+
+          <div class="stack" id="liveRun" hidden>
+            <section class="card listen">
+              <div class="listen-head">
+                <span class="dot" id="liveDot" aria-hidden="true"></span>
+                <b id="liveState">Not listening</b>
+                <button class="primary-btn small" id="liveListen" type="button" disabled>Start listening</button>
+                <button class="soft-btn small" id="liveStop" type="button" hidden>Stop listening</button>
+              </div>
+              <label class="check consent">
+                <input id="liveConsent" type="checkbox" />
+                <span>The candidate knows this call is transcribed and agreed to it.</span>
+              </label>
+              <div class="transcript" id="liveTranscript" aria-live="polite"></div>
+              <div class="row end">
+                <button class="link-btn" id="liveCopyTranscript" type="button">Copy transcript</button>
+              </div>
+              <p class="help">Keep this panel open during the call. Audio goes straight to the speech service and isn’t stored. The transcript is cleared when the interview ends.</p>
+            </section>
+
+            <section class="card">
+              <div class="section-head">
+                <h3>Skills to cover</h3>
+                <span class="muted" id="liveCoverage"></span>
+              </div>
+              <div class="meter" aria-hidden="true"><span id="liveCoverBar"></span></div>
+              <ol class="checklist" id="liveSkills"></ol>
+            </section>
+
+            <details class="card" id="livePlan" hidden>
+              <summary>Your planned questions</summary>
+              <ul class="plan-list" id="livePlanList"></ul>
+            </details>
+
+            <section class="card" id="liveFollowups">
+              <h3>Follow-up questions</h3>
+              <label>Skill<select id="liveSkill"></select></label>
+              <label>Question you asked <span class="muted">(optional)</span><input id="liveQuestion" type="text" /></label>
+              <label>Their answer<textarea id="liveAnswer" rows="3" placeholder="Type it, or use the transcript"></textarea></label>
+              <div class="row">
+                <button class="soft-btn" id="liveUseTranscript" type="button">Use the transcript</button>
+                <button class="primary-btn" id="liveSuggest" type="button">Suggest follow-ups</button>
+              </div>
+              <ul class="suggestions" id="liveSuggestions"></ul>
+              <p class="help">Suggestions are prompts for you to ask. Nothing is scored.</p>
+            </section>
+
+            <section class="card">
+              <h3>Other notes</h3>
+              <textarea id="liveGeneral" rows="3" placeholder="Anything else worth remembering"></textarea>
+            </section>
+
+            <div class="row footer-actions">
+              <button class="soft-btn" id="liveCopy" type="button">Copy notes</button>
+              <button class="primary-btn" id="liveEnd" type="button">End interview</button>
+            </div>
+          </div>
+          </div>
+        </div>
+
+        <!-- Notes: interviews that have ended -->
+        <div class="stack" id="section-notes" role="tabpanel" aria-labelledby="sec-notes" hidden></div>
+        </div>
+      </main>
+
+      <!-- ============ Demo (from Upcoming when empty, or Settings) ============ -->
+      <main class="view" id="view-demo" aria-label="Demo" hidden>
+        <button class="link-btn back" id="demoBack" type="button"><svg><use href="#i-left"/></svg><span id="demoBackLabel">Back</span></button>
+        <section class="card demo-head">
+          <p class="muted">A short made-up interview. No call, no AI, nothing saved.</p>
+          <h2 id="demoName"></h2>
+          <p class="muted" id="demoJob"></p>
+          <button class="primary-btn" id="demoPlay" type="button">Play the demo</button>
+        </section>
+
+        <section class="card">
+          <h3>Live transcript</h3>
+          <div class="transcript tall" id="demoTranscript" aria-live="polite"></div>
+        </section>
+
+        <section class="card" id="demoSuggestBox" hidden>
+          <h3>Follow-up ideas</h3>
+          <ul class="suggestions" id="demoSuggestions"></ul>
+        </section>
+
+        <section class="card">
+          <div class="section-head">
+            <h3>Skills to cover</h3>
+            <span class="muted" id="demoCoverage"></span>
+          </div>
+          <div class="meter" aria-hidden="true"><span id="demoCoverBar"></span></div>
+          <ol class="checklist" id="demoSkills"></ol>
+          <p class="help">In a real interview you tick skills yourself. The demo ticks them to show the idea.</p>
+        </section>
+
+        <details class="card">
+          <summary>The interview plan</summary>
+          <ul class="plan-list" id="demoPlanList"></ul>
+        </details>
+      </main>
+
+      <p class="toast" id="toast" role="status" aria-live="polite" hidden></p>
+    </div>
+
+    <!-- ============ Sheets ============ -->
+    <dialog class="sheet tall" id="jobSheet" aria-labelledby="jobSheetTitle">
+      <div class="sheet-head">
+        <h2 id="jobSheetTitle">Add a job</h2>
+        <button class="icon-btn" data-close type="button" aria-label="Close"><svg><use href="#i-close"/></svg></button>
+      </div>
+      <div class="sheet-body">
+        <label>Job title<input id="jobFormTitle" type="text" maxlength="120" placeholder="e.g. Backend Engineer" /></label>
+        <label>Company or client <span class="muted">(optional)</span><input id="jobFormCompany" type="text" maxlength="120" /></label>
+        <label>Job description<textarea id="jobFormDescription" rows="7" placeholder="Paste the job description"></textarea></label>
+        <button class="soft-btn" id="jobFormMakeSkills" type="button">Make checklist from the description</button>
+        <h3>Skills to cover</h3>
+        <p class="help" id="jobFormSkillsEmpty">No skills yet. Make them from the description, or add your own.</p>
+        <ul class="edit-list" id="jobFormSkills"></ul>
+        <div class="row add-row">
+          <input id="jobFormNewSkill" type="text" maxlength="80" placeholder="Add a skill" aria-label="New skill" />
+          <button class="soft-btn" id="jobFormAddSkill" type="button">Add</button>
+        </div>
+      </div>
+      <div class="sheet-foot">
+        <button class="soft-btn" data-close type="button">Cancel</button>
+        <button class="primary-btn" id="jobFormSave" type="button">Save job</button>
+      </div>
+    </dialog>
+
+    <dialog class="sheet tall" id="candidateSheet" aria-labelledby="candSheetTitle">
+      <div class="sheet-head">
+        <div>
+          <h2 id="candSheetTitle">Add a candidate</h2>
+          <p class="muted" id="candSheetJob"></p>
+        </div>
+        <button class="icon-btn" data-close type="button" aria-label="Close"><svg><use href="#i-close"/></svg></button>
+      </div>
+      <div class="sheet-body">
+        <label>Name<input id="candFormName" type="text" maxlength="120" autocomplete="off" /></label>
+        <label>Email <span class="muted">(optional)</span><input id="candFormEmail" type="email" maxlength="200" autocomplete="off" /></label>
+        <label>Profile link <span class="muted">(LinkedIn, portfolio, GitHub)</span><input id="candFormProfile" type="url" maxlength="500" placeholder="https://" /></label>
+        <p class="help">Debrief only keeps the link so you can open it. It doesn’t read the page.</p>
+        <label>Interview date <span class="muted">(optional)</span><input id="candFormInterviewAt" type="datetime-local" /></label>
+        <h3>Resume</h3>
+        <label class="file-btn soft-btn" id="candFormFileLabel">Upload PDF<input id="candFormFile" type="file" accept="application/pdf" hidden /></label>
+        <label>Or paste the text<textarea id="candFormResume" rows="8"></textarea></label>
+        <p class="help">Kept on this computer. Uploading sends the PDF to the server once to read the text; nothing is stored there.</p>
+      </div>
+      <div class="sheet-foot">
+        <button class="soft-btn" data-close type="button">Cancel</button>
+        <button class="primary-btn" id="candFormSave" type="button">Save candidate</button>
+      </div>
+    </dialog>
+
+    <dialog class="sheet tall" id="settingsSheet" aria-labelledby="settingsTitle">
+      <div class="sheet-head">
+        <h2 id="settingsTitle">Settings</h2>
+        <button class="icon-btn" data-close type="button" aria-label="Close"><svg><use href="#i-close"/></svg></button>
+      </div>
+      <div class="sheet-body">
+        <fieldset>
+          <legend>Server</legend>
+          <label>Server address<input id="setServer" type="url" placeholder="http://localhost:8789" /></label>
+          <label>App token<input id="setToken" type="password" autocomplete="off" /></label>
+          <p class="help">Until sign-in is ready, use the same token as the server’s DEBRIEF_APP_TOKEN.</p>
+        </fieldset>
+        <fieldset>
+          <legend>Interviews</legend>
+          <label>Language of the call
+            <select id="setLanguage">
+              <option value="en">English</option>
+              <option value="de">German</option>
+              <option value="multi">Several languages</option>
+            </select>
+          </label>
+        </fieldset>
+        <fieldset>
+          <legend>Look</legend>
+          <div class="seg" id="setTheme" role="radiogroup" aria-label="Theme">
+            <button role="radio" data-v="system" aria-checked="true" type="button">System</button>
+            <button role="radio" data-v="light" aria-checked="false" type="button">Light</button>
+            <button role="radio" data-v="dark" aria-checked="false" type="button">Dark</button>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Privacy</legend>
+          <label>Delete candidates not changed for
+            <select id="setRetention">
+              <option value="30">30 days</option>
+              <option value="90">90 days</option>
+              <option value="180">180 days</option>
+              <option value="365">1 year</option>
+              <option value="0">Never (I’ll delete them)</option>
+            </select>
+          </label>
+          <p class="help">Deleting a candidate removes their resume, plan and notes. Check how long your company may keep candidate data.</p>
+          <button class="link-btn danger" id="setDeleteAll" type="button">Delete all jobs, candidates and notes</button>
+        </fieldset>
+        <details class="guide">
+          <summary>How to use Debrief</summary>
+          <ol>
+            <li><b>Jobs:</b> add a job, paste its description and make the skills checklist. Add each candidate with their profile link, interview date and resume.</li>
+            <li><b>Interview</b> (first tab): opens on the interview that’s running, or your next candidate. <b>Upcoming</b> lists everyone due; tap someone to see their page, then “Interview now” to make them current.</li>
+            <li><b>Plan:</b> make an interview plan: what their resume shows for each skill and what to ask.</li>
+            <li><b>Interview:</b> open the call in a Chrome tab, click the Debrief icon on that tab, tell the candidate the call is transcribed, then start. Tick skills as you cover them and write notes.</li>
+            <li><b>Notes:</b> after you end the interview, your notes are kept there to read or copy. Debrief never scores candidates.</li>
+          </ol>
+        </details>
+        <button class="link-btn" id="setDemo" type="button">Watch a short demo</button>
+      </div>
+      <div class="sheet-foot">
+        <button class="soft-btn" data-close type="button">Cancel</button>
+        <button class="primary-btn" id="setSave" type="button">Save</button>
+      </div>
+    </dialog>
+
+    <dialog class="sheet" id="confirmSheet" aria-labelledby="confirmTitle">
+      <div class="sheet-head"><h2 id="confirmTitle"></h2></div>
+      <div class="sheet-body"><p id="confirmBody"></p></div>
+      <div class="sheet-foot">
+        <button class="soft-btn" id="confirmNo" type="button">Keep</button>
+        <button class="primary-btn" id="confirmYes" type="button">Delete</button>
+      </div>
+    </dialog>
+
+    <script type="module" src="panel.js"></script>
+  </body>
+</html>

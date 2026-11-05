@@ -3,8 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Chrome extension for Debrief. The type field lets the pure logic modules be tested with node --test.",
+  "description": "Chrome extension for Debrief. Sources in src/, built into dist/ (load dist/ unpacked). The pure logic modules are tested in Node, which runs the .ts files directly.",
   "scripts": {
-    "test": "node --test test/store.test.mjs test/transcript.test.mjs test/demo.test.mjs"
+    "build": "node build.ts",
+    "watch": "node build.ts --watch",
+    "test": "node --test \"test/*.test.ts\"",
+    "typecheck": "tsc"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.3.7",
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
   }
 }
