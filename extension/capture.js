@@ -7,9 +7,15 @@ const CHUNK_MS = 250;
 
 // Starts listening to one tab. Calls onTranscript(transcript) as lines arrive and onStatus(text, isError).
 // Returns { stop() }. Throws a user-facing Error if it can't start.
-export async function startListening({ tabId, getKey, onTranscript, onStatus }) {
+export async function startListening({ tabId, language = 'en', getKey, onTranscript, onStatus }) {
   // 1. Get the tab's audio. The tab goes quiet for the user, so we also play it back below.
-  const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
+  // Chrome only allows this after the Debrief icon was clicked on that tab (it grants access to the tab).
+  let streamId;
+  try {
+    streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
+  } catch {
+    throw new Error('Click the Debrief icon in Chrome’s toolbar while you’re on the call tab, then press Start listening again.');
+  }
   const tabStream = await navigator.mediaDevices.getUserMedia({
     audio: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: streamId } },
     video: false,
@@ -29,7 +35,7 @@ export async function startListening({ tabId, getKey, onTranscript, onStatus }) 
   }
 
   // 3. Connect to Deepgram. The key goes in the subprotocol, as Deepgram's browser auth expects.
-  const ws = new WebSocket(listenUrl({ language: 'en' }), ['token', key]);
+  const ws = new WebSocket(listenUrl({ language }), ['token', key]);
   ws.binaryType = 'arraybuffer';
 
   let transcript = emptyTranscript();

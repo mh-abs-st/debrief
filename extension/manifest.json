@@ -2,8 +2,14 @@
   "manifest_version": 3,
   "name": "Debrief",
   "version": "0.1.0",
-  "description": "A side-panel assistant that helps interviewers ask better follow-up questions and keep structured notes.",
-  "permissions": ["sidePanel", "storage", "tabs", "tabCapture"],
+  "description": "Interview notes for hiring teams: skills checklist, live transcript, follow-up questions and plans. No candidate scores.",
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "tabs",
+    "tabCapture",
+    "activeTab"
+  ],
   "host_permissions": [
     "http://localhost:8789/*",
     "https://api.deepgram.com/*",
