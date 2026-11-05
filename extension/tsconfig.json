@@ -1,0 +1,21 @@
+{
+  // Type-checks the sources and the tests. The build (tsconfig.build.json) emits only src/ into dist/.
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "types": ["chrome", "node"],
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "erasableSyntaxOnly": true,
+    // A file without import/export stays a classic script (no `export {}` added): theme-init.js is loaded
+    // with a plain <script> so the theme is set before the page draws.
+    "moduleDetection": "legacy",
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts", "build.ts"]
+}

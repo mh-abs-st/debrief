@@ -4,12 +4,17 @@
   "private": true,
   "description": "Backend for Debrief",
   "type": "module",
-  "main": "index.js",
+  "main": "index.ts",
   "scripts": {
-    "start": "node --env-file=.env index.js",
-    "test": "node --test test/app.test.mjs test/deepgram.test.mjs test/plan.test.mjs"
+    "start": "node --env-file=.env index.ts",
+    "test": "node --test \"test/*.test.ts\"",
+    "typecheck": "tsc"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.18"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
   }
 }
