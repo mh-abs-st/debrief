@@ -11,7 +11,7 @@ Why Debrief is the way it is. Read this before changing what the AI produces, wh
 ## The line we don't cross (EU AI Act)
 
 - **No scores, fit labels, rankings or hire/reject recommendations** anywhere. Hiring AI that evaluates candidates is high-risk under the AI Act. Debrief supports the interviewer's judgement and never makes it.
-- **Prepare makes an interview plan, not a resume match** (2026-11-04). Offro's resume match gives a 0–100 fit score; Debrief doesn't. The plan shows what the resume says per skill, what to find out, questions, and claims to check. `server/lib/plan.js` drops any score or label the model adds.
+- **The Plan is an interview plan, not a resume match** (2026-11-04). Offro's resume match gives a 0–100 fit score; Debrief doesn't. The plan shows what the resume says per skill, what to find out, questions, and claims to check. `server/lib/plan.ts` drops any score or label the model adds.
 - **Follow-ups never judge the answer** and never ask about personal traits (age, family, health, religion and so on).
 - **No emotion, tone or personality analysis.**
 

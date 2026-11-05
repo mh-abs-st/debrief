@@ -2,7 +2,7 @@
 
 A Chrome side-panel assistant for interviewers at small companies and agencies. Keep your jobs and candidates in one place, prepare questions from each resume, take structured notes during the call, and get follow-up questions from what the candidate just said. It supports the interviewer's judgement and never makes the decision.
 
-**Status:** MVP. Every page works with a fake server in a browser test. Not yet tried on a real call or against the live AI and speech services; see Next steps in `docs/scope.md`.
+**Status:** MVP. Every page works with a fake server in a browser test. Not yet tried on a real call or against the live AI and speech services; see the To-Do in `docs/scope.md` and [GitHub Issues](https://github.com/mh-abs-st/debrief/issues).
 
 ## How it's organised
 

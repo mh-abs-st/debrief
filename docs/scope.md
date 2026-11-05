@@ -15,16 +15,41 @@ Interviewers at small companies and agencies who run their own interviews, with 
 7. **Demo:** scripted interview with made-up people; no AI or saved data. From the empty Interview tab or Settings.
 8. **Settings:** server and token, call language, theme, data retention, delete everything.
 
-Checked in a browser with a fake server and fake Chrome APIs; not yet on a real call.
+Checked in a browser with a fake server and fake Chrome APIs. The Deepgram temporary-key flow works against the live service; a full real call is still to do (#7).
 
-## Next steps
+## To-Do
 
-1. Load the extension in Chrome and run one real call (Google Meet first). Check tab capture from the side panel and that the transcript appears.
-2. Check the Deepgram temporary-key flow (`/v1/auth/grant`) and the browser login against Deepgram's current docs, since neither has been tried with a live key.
-3. Try `/api/plan` and `/api/resume/parse` with real resumes and tune the prompts.
-4. Add a visible recording indicator, and stop listening when the call tab closes.
-5. Sign-in and billing (now one shared app token); reuse Offro's Supabase and Stripe code.
-6. Get data processing agreements with Deepgram and Anthropic, write the candidate notice, and get both reviewed before real candidate data.
+The backlog is in [GitHub Issues](https://github.com/mh-abs-st/debrief/issues): one issue per task, labelled `bug`, `enhancement`, `research`, `compliance`, `privacy` and `priority: high`. Add new work there, not here. As of 2026-11-05:
+
+**First (`priority: high`)**
+- [#1](https://github.com/mh-abs-st/debrief/issues/1) Deleting the current candidate while listening keeps transcribing the call
+- [#2](https://github.com/mh-abs-st/debrief/issues/2) Save failures are silent, and storage is capped at 10 MB
+- [#7](https://github.com/mh-abs-st/debrief/issues/7) Test a real call end to end (Google Meet first)
+- [#9](https://github.com/mh-abs-st/debrief/issues/9) Show a clear recording indicator, and stop listening when the call tab closes
+
+**Bugs**
+- [#3](https://github.com/mh-abs-st/debrief/issues/3) Error messages never go away and cover the page
+- [#4](https://github.com/mh-abs-st/debrief/issues/4) Adding an interview date to an existing candidate doesn't move them to Scheduled
+- [#5](https://github.com/mh-abs-st/debrief/issues/5) Interview plan isn't marked out of date when the job's skills change
+- [#6](https://github.com/mh-abs-st/debrief/issues/6) Notes typed just before closing the panel can be lost
+
+**Product**
+- [#10](https://github.com/mh-abs-st/debrief/issues/10) Capture the interviewer's microphone too, with speaker labels
+- [#11](https://github.com/mh-abs-st/debrief/issues/11) Back up and restore all data
+- [#12](https://github.com/mh-abs-st/debrief/issues/12) Edit notes after an interview ends, and delete a single interview
+- [#15](https://github.com/mh-abs-st/debrief/issues/15) Keyboard shortcut to open Debrief on the call tab
+- [#16](https://github.com/mh-abs-st/debrief/issues/16) Fill interview dates from a calendar
+- [#17](https://github.com/mh-abs-st/debrief/issues/17) German interface
+- [#18](https://github.com/mh-abs-st/debrief/issues/18) Sign-in and billing instead of the shared app token
+
+**Engineering**
+- [#13](https://github.com/mh-abs-st/debrief/issues/13) Run tests, type checks and the build on every push
+- [#14](https://github.com/mh-abs-st/debrief/issues/14) Add extension icons and a Chrome Web Store package
+
+**Before real candidate data**
+- [#8](https://github.com/mh-abs-st/debrief/issues/8) Tune the plan and resume prompts on real resumes
+- [#19](https://github.com/mh-abs-st/debrief/issues/19) Processor agreements, candidate notice and DPIA
+- [#20](https://github.com/mh-abs-st/debrief/issues/20) Talk to 8 to 10 small-company founders or agency leads
 
 ## Out of scope for MVP
 
