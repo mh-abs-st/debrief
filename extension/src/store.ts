@@ -311,6 +311,58 @@ export function coverage(interview: Interview | null | undefined): { covered: nu
   return { covered, total };
 }
 
+// ---------- Upcoming (who you're interviewing next) ----------
+
+// 'YYYY-MM-DD' for a date in the interviewer's own time zone (interviewAt is stored as local 'YYYY-MM-DDTHH:mm').
+export function localDateKey(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+export interface UpcomingGroups {
+  inProgress: Candidate[]; // an interview was started and not ended
+  today: Candidate[];
+  later: Candidate[];
+  earlier: Candidate[]; // the date has passed but they haven't been interviewed yet
+  unscheduled: Candidate[]; // no interview date yet
+}
+
+// Candidates of open jobs who still need an interview, grouped by when. today = localDateKey(new Date()).
+// Candidates already interviewed or decided are left out (they stay in Jobs), unless an interview is running.
+export function upcoming(state: State, today: string): UpcomingGroups {
+  const groups: UpcomingGroups = { inProgress: [], today: [], later: [], earlier: [], unscheduled: [] };
+  const openJobs = new Set(state.jobs.filter((j) => j.status === 'open').map((j) => j.id));
+  for (const c of state.candidates) {
+    if (!openJobs.has(c.jobId)) continue;
+    if (openInterview(state, c.id)) groups.inProgress.push(c);
+    else if (c.stage === 'interviewed' || c.stage === 'decided') continue;
+    else if (!c.interviewAt) groups.unscheduled.push(c);
+    else {
+      const day = c.interviewAt.slice(0, 10);
+      groups[day === today ? 'today' : day > today ? 'later' : 'earlier'].push(c);
+    }
+  }
+  const byTime = (a: Candidate, b: Candidate) => a.interviewAt.localeCompare(b.interviewAt);
+  groups.today.sort(byTime);
+  groups.later.sort(byTime);
+  groups.earlier.sort((a, b) => byTime(b, a)); // most recent first
+  groups.unscheduled.sort((a, b) => a.createdAt - b.createdAt);
+  return groups;
+}
+
+// The candidate the Interview tab shows. In order: the interview that is running (the most recently
+// started, if several), the candidate you chose (`chosen`, if they still exist), then the next one due
+// today or later. '' when there is no one.
+export function currentCandidateId(state: State, today: string, chosen = ''): string {
+  const running = state.interviews
+    .filter((iv) => !iv.endedAt && getCandidate(state, iv.candidateId))
+    .sort((a, b) => b.startedAt - a.startedAt)[0];
+  if (running) return running.candidateId;
+  if (chosen && getCandidate(state, chosen)) return chosen;
+  const g = upcoming(state, today);
+  return (g.today[0] || g.later[0])?.id || '';
+}
+
 // ---------- Retention (GDPR: don't keep candidate data longer than needed) ----------
 
 // Removes candidates (and their notes) not changed for more than `days`. days = 0 means keep until deleted.

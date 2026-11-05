@@ -2,6 +2,7 @@
    Tokens follow Offro's pattern (light/dark via data-theme or the system), with Debrief's own teal accent. */
 
 :root {
+  --gap: 10px; /* the one space between blocks (cards, rows, sections) on every page */
   --bg: #f4f6f7;
   --surface: #ffffff;
   --raise: #eaeef0;
@@ -91,7 +92,10 @@ p { margin: 0 0 8px; }
 }
 .tabs [role='tab'][aria-selected='true'] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
 .tabs [role='tab']:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.view { padding: 12px 12px 72px; display: flex; flex-direction: column; gap: 10px; }
+/* Pages and the blocks inside them stack with the same gap; the gap is the only space between blocks. */
+.view { padding: 12px 12px 72px; }
+.view, .stack { display: flex; flex-direction: column; gap: var(--gap); }
+.view > *, .stack > * { margin-top: 0; margin-bottom: 0; }
 
 /* ---------- Buttons ---------- */
 .primary-btn, .soft-btn {
@@ -136,8 +140,8 @@ fieldset { border: 1px solid var(--line); border-radius: var(--radius); padding:
 legend { font-weight: 700; padding: 0 4px; }
 
 .seg { display: flex; background: var(--raise); padding: 3px; border-radius: 9px; gap: 2px; margin-bottom: 8px; }
-.seg [role='radio'] { flex: 1; border: 0; background: transparent; padding: 5px; border-radius: 7px; color: var(--muted); font-weight: 600; cursor: pointer; }
-.seg [aria-checked='true'] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
+.seg [role='radio'], .seg [role='tab'] { flex: 1; border: 0; background: transparent; padding: 5px; border-radius: 7px; color: var(--muted); font-weight: 600; cursor: pointer; }
+.seg [aria-checked='true'], .seg [aria-selected='true'] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
 
 /* ---------- Pickers ---------- */
 .picker { display: grid; grid-template-columns: auto 1fr 1fr; gap: 6px; align-items: center; }
@@ -148,15 +152,19 @@ legend { font-weight: 700; padding: 0 4px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; }
 details.card > summary { cursor: pointer; font-weight: 700; }
 details.card[open] > summary { margin-bottom: 8px; }
-.cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.job-card {
+.cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--gap); }
+.job-card, .person-card {
   width: 100%; text-align: left; display: flex; flex-direction: column; gap: 2px; cursor: pointer;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px;
 }
-.job-card:hover { border-color: var(--accent); }
+.job-card:hover, .person-card:hover { border-color: var(--accent); }
 .card-title { font-weight: 700; }
 .card-sub { color: var(--text); }
 .card-meta { color: var(--muted); font-size: 12.5px; }
+.card-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.when { color: var(--accent); font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.group { display: flex; flex-direction: column; gap: 6px; }
+.group-title { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin: 0; }
 .cand-card { display: flex; flex-direction: column; gap: 4px; padding: 10px; background: var(--bg); }
 .cand-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
 .stage-select { width: auto; margin: 0; padding: 3px 6px; font-size: 12.5px; }
@@ -169,6 +177,7 @@ details.card[open] > summary { margin-bottom: 8px; }
 .skill-list, .facts { margin: 0; padding-left: 18px; }
 .skill-list li, .facts li { margin-bottom: 6px; }
 .person { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.person > .row { flex: none; flex-wrap: nowrap; gap: 12px; }
 
 /* ---------- Live ---------- */
 .listen-head { display: flex; align-items: center; gap: 8px; }
@@ -200,9 +209,8 @@ details.card[open] > summary { margin-bottom: 8px; }
   display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
   color: var(--accent); background: var(--accent-wash); border-radius: 4px; padding: 1px 6px; margin-right: 6px;
 }
-.past { list-style: none; margin: 0; padding: 0; }
-.past li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 0; border-top: 1px solid var(--line); }
-.past li:first-child { border-top: 0; }
+.note-list { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.note-text { margin: 2px 0 0; white-space: pre-wrap; }
 
 /* ---------- Prepare plan ---------- */
 .plan h3 { margin-top: 12px; }

@@ -6,8 +6,8 @@ Chrome MV3 side-panel assistant for interviewers (jobs and candidates, interview
 ## Layout
 All TypeScript (strict). Node ≥ 22.18 runs `.ts` directly, so the server and tests have no build. Imports name the `.ts` file; erasable syntax only (no `enum`, `namespace`, parameter properties).
 - `extension/`: sources in `src/`, built with `npm run build` (plain `tsc`, one ES module per file) into `dist/`. Load `dist/` unpacked.
-  - `src/panel.html|css|ts`: tabs Live, Prepare, Jobs, Demo, plus sheets (job, candidate, settings, confirm).
-  - Views: `live-view.ts`, `prepare-view.ts`, `jobs-view.ts`, `demo-view.ts`, `settings-view.ts`. Shared: `picker.ts`, `ui.ts`, `api.ts`, `data.ts`.
+  - `src/panel.html|css|ts`: tabs Interview (the current candidate's page: Plan, Interview, Notes), Upcoming and Jobs (both can open anyone's page to look at it); a demo page; sheets (job, candidate, settings, confirm). `panel.ts` implements the `Nav` from `ui.ts` that every view uses to move around.
+  - Views: `upcoming-view.ts`, `jobs-view.ts`, `candidate-view.ts` (+ `plan-view.ts`, `interview-view.ts`), `demo-view.ts`, `settings-view.ts`. Shared: `ui.ts`, `api.ts`, `data.ts`.
   - Pure, tested: `store.ts` (also the data types), `transcript.ts`, `demo-script.ts`. Audio: `capture.ts`.
 - `server/`: ESM, no runtime npm dependencies (TypeScript is dev only). `index.ts` reads env; `lib/app.ts` has the routes.
 

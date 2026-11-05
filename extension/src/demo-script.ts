@@ -1,4 +1,4 @@
-// The Demo tab's scripted interview. Made-up people and company; no AI, no server, no real data.
+// The demo page's scripted interview. Made-up people and company; no AI, no server, no real data.
 // Pure data plus one function, so it can be tested in Node.
 import type { Plan, Skill } from './store.ts';
 
