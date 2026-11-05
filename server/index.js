@@ -7,6 +7,7 @@ const {
   ANTHROPIC_API_KEY = '',
   DEBRIEF_APP_TOKEN = '',
   FAST_MODEL = 'claude-haiku-5-5',
+  ASSIST_MODEL = 'claude-sonnet-5-5',
   DEEPGRAM_API_KEY = '',
 } = process.env;
 
@@ -17,7 +18,7 @@ if (!DEEPGRAM_API_KEY) console.warn('[warn] DEEPGRAM_API_KEY is not set. Live tr
 
 const complete = makeClaude({ apiKey: ANTHROPIC_API_KEY });
 const grantKey = DEEPGRAM_API_KEY ? makeGrantKey({ apiKey: DEEPGRAM_API_KEY }) : null;
-const server = createApp({ complete, grantKey, appToken: DEBRIEF_APP_TOKEN, models: { fast: FAST_MODEL } });
+const server = createApp({ complete, grantKey, appToken: DEBRIEF_APP_TOKEN, models: { fast: FAST_MODEL, assist: ASSIST_MODEL } });
 
 server.listen(Number(PORT), () => {
   console.log(`Debrief server listening on http://localhost:${PORT}`);

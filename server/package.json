@@ -6,8 +6,8 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "node --env-file=.env index.js",
-    "test": "node --test test/app.test.mjs test/deepgram.test.mjs"
+    "start": "node index.js",
+    "test": "node --test test/app.test.mjs test/deepgram.test.mjs test/plan.test.mjs"
   },
   "engines": {
     "node": ">=20"

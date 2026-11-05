@@ -37,3 +37,11 @@ test('copied text includes finals and any pending interim line', () => {
   t = applyMessage(t, result('Second', false));
   assert.equal(transcriptText(t), 'First line.\nSecond');
 });
+
+test('recent text joins only the last few final lines', async () => {
+  const { recentText } = await import('../transcript.js');
+  let t = emptyTranscript();
+  for (const s of ['one', 'two', 'three']) t = applyMessage(t, result(s, true));
+  t = applyMessage(t, result('pending', false));
+  assert.equal(recentText(t, 2), 'two three');
+});
