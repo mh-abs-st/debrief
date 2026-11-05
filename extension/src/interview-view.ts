@@ -1,33 +1,27 @@
-// Live tab: the interview itself. Checklist and notes for the chosen candidate, the live transcript,
-// follow-up suggestions and the questions you planned in Prepare.
-import { $, el, toast, confirmSheet, fillSelect, withBusy, formatDate, errorMessage, type GoTo } from './ui.ts';
-import { getState, getSettings, commit, commitSoon, subscribe } from './data.ts';
+// Interview section of a candidate's page: the interview itself. Checklist and notes, the live transcript,
+// follow-up suggestions and the questions from the plan.
+import { $, el, toast, confirmSheet, fillSelect, withBusy, errorMessage } from './ui.ts';
+import { getState, getSettings, commit, commitSoon } from './data.ts';
 import { api } from './api.ts';
-import { createPicker, type Picker } from './picker.ts';
 import { startListening, type Listening } from './capture.ts';
 import { emptyTranscript, recentText, transcriptText } from './transcript.ts';
 import * as S from './store.ts';
 
-let picker: Picker;
-let goTo: GoTo = () => {};
+let candidateId = ''; // the candidate this section shows
+let listeningFor = ''; // the candidate whose call is being transcribed
 let listening: Listening | null = null; // set while the call is being transcribed
 let transcript = emptyTranscript(); // kept in this panel only, never saved
+let onEnd: (candidateId: string) => void = () => {};
 
 const input = (id: string) => $<HTMLInputElement>(id);
 const textarea = (id: string) => $<HTMLTextAreaElement>(id);
 const button = (id: string) => $<HTMLButtonElement>(id);
 
-export function initLive({ onGo }: { onGo: GoTo }): void {
-  goTo = onGo;
-  picker = createPicker($('livePicker'), {
-    onChange: () => {
-      stopListening(); // never keep listening for a candidate you switched away from
-      render();
-    },
-  });
-
+// onEnd runs just before an ended interview is saved, so the page can keep this candidate and show Notes
+// (saving redraws everything, and the Interview tab would otherwise move on to the next candidate).
+export function initInterview(options: { onEnd: (candidateId: string) => void }): void {
+  onEnd = options.onEnd;
   $('liveStart').addEventListener('click', async () => {
-    const { candidateId } = picker.get();
     const { state } = S.startInterview(getState(), candidateId);
     transcript = emptyTranscript();
     renderTranscript();
@@ -60,55 +54,41 @@ export function initLive({ onGo }: { onGo: GoTo }): void {
     copy(text, 'Transcript copied.');
   });
   $('liveEnd').addEventListener('click', endInterview);
-
-  subscribe(() => {
-    picker.refresh();
-    render();
-  });
-  picker.refresh();
-  render();
   renderTranscript();
 }
 
-export function selectForLive(jobId: string | null | undefined, candidateId: string | null | undefined): void {
-  stopListening();
-  picker.set(jobId, candidateId);
+// Shows the interview for this candidate. candidate-view calls it on open and after every change.
+// Opening a different candidate stops listening: never keep transcribing a call you moved away from.
+export function renderInterviewSection(id: string): void {
+  if (id !== candidateId) {
+    if (listeningFor && listeningFor !== id) {
+      stopListening();
+      transcript = emptyTranscript();
+      renderTranscript();
+    }
+    candidateId = id;
+    $('liveSuggestions').replaceChildren();
+    textarea('liveAnswer').value = '';
+    input('liveQuestion').value = '';
+  }
   render();
 }
 
 export const isListening = (): boolean => Boolean(listening);
+// The candidate whose call is being transcribed, or '' when not listening.
+export const listeningCandidate = (): string => (listening ? listeningFor : '');
 
 function currentInterview(): S.Interview | null {
-  const { candidateId } = picker.get();
   return candidateId ? S.openInterview(getState(), candidateId) : null;
 }
 
 function render() {
   const state = getState();
-  const { jobId, candidateId } = picker.get();
-  const job = S.getJob(state, jobId);
   const cand = S.getCandidate(state, candidateId);
-
-  if (!job || !cand) {
-    $('liveBody').hidden = true;
-    $('liveEmpty').hidden = false;
-    $('liveEmpty').replaceChildren(
-      el('p', {}, !state.jobs.length ? 'Add a job and a candidate in Jobs, then come back here for the interview.' : 'Add a candidate to this job first.'),
-      el('button', { class: 'primary-btn', type: 'button', onclick: () => goTo('jobs', { jobId: job?.id, addCandidate: Boolean(job) }) }, job ? 'Add a candidate' : 'Add a job'),
-      el('p', { class: 'help' }, 'Want to see how it works first? Try the Demo tab.'),
-    );
-    return;
-  }
-  $('liveEmpty').hidden = true;
-  $('liveBody').hidden = false;
+  const job = cand && S.getJob(state, cand.jobId);
+  if (!cand || !job) return;
 
   const iv = S.openInterview(state, cand.id);
-  $('liveName').textContent = cand.name;
-  $('liveMeta').textContent = [S.STAGE_LABELS[cand.stage], cand.interviewAt ? formatDate(cand.interviewAt) : ''].filter(Boolean).join(' · ');
-  const profile = $<HTMLAnchorElement>('liveProfile');
-  profile.hidden = !cand.profileUrl;
-  if (cand.profileUrl) profile.href = cand.profileUrl;
-
   $('liveStartBox').hidden = Boolean(iv);
   $('liveRun').hidden = !iv;
   $('liveNoSkills').hidden = Boolean(job.skills.length);
@@ -121,7 +101,6 @@ function render() {
     if (document.activeElement !== $('liveGeneral')) textarea('liveGeneral').value = iv.generalNotes;
   }
   renderPlan(cand);
-  renderPast(cand);
   updateListenButtons();
 }
 
@@ -171,22 +150,6 @@ function renderPlan(cand: S.Candidate) {
   $('livePlanList').replaceChildren(...items);
 }
 
-function renderPast(cand: S.Candidate) {
-  const past = S.interviewsFor(getState(), cand.id).filter((i) => i.endedAt);
-  $('livePast').hidden = !past.length;
-  $('livePastList').replaceChildren(
-    ...past.map((iv) => {
-      const { covered, total } = S.coverage(iv);
-      return el(
-        'li',
-        {},
-        el('span', {}, `${formatDate(new Date(iv.startedAt).toISOString())} · ${covered} of ${total} covered`),
-        el('button', { class: 'link-btn', type: 'button', onclick: () => copy(S.interviewMarkdown(getState(), iv.id), 'Notes copied.') }, 'Copy notes'),
-      );
-    }),
-  );
-}
-
 // ---------- Listening ----------
 
 function updateListenButtons() {
@@ -215,6 +178,7 @@ async function start() {
   if (!tab?.id || !/^https:/.test(tab.url || '')) return toast('Open the call in a browser tab first (Google Meet, Zoom or Teams on the web).', { error: true });
   toast('Starting…');
   try {
+    listeningFor = candidateId;
     listening = await startListening({
       tabId: tab.id,
       language: getSettings().language,
@@ -227,12 +191,14 @@ async function start() {
         if (text !== 'Stopped.') toast(text === 'Listening' ? 'Listening to the call.' : text, { error: isError });
         if (isError) {
           listening = null;
+          listeningFor = '';
           updateListenButtons();
         }
       },
     });
   } catch (err) {
     listening = null;
+    listeningFor = '';
     toast(errorMessage(err, 'We couldn’t start listening. Please try again.'), { error: true });
   }
   updateListenButtons();
@@ -242,6 +208,7 @@ function stopListening() {
   if (!listening) return;
   listening.stop();
   listening = null;
+  listeningFor = '';
   updateListenButtons();
 }
 
@@ -281,6 +248,7 @@ async function endInterview() {
   });
   if (!ok) return;
   stopListening();
+  onEnd(candidateId);
   await commit(S.endInterview(getState(), iv.id));
   transcript = emptyTranscript();
   renderTranscript();
@@ -289,10 +257,10 @@ async function endInterview() {
   textarea('liveAnswer').value = '';
   input('liveQuestion').value = '';
   updateListenButtons();
-  toast('Interview ended. Notes saved on this computer.');
+  toast('Interview ended. Your notes are under Notes.');
 }
 
-async function copy(text: string, done: string) {
+export async function copy(text: string, done: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text);
     toast(done);

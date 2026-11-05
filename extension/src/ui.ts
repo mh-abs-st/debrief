@@ -1,10 +1,26 @@
 // Small DOM helpers. Everything is built with createElement and textContent (never innerHTML),
 // so text from jobs, resumes or the AI can't inject markup.
 
-export type Tab = 'live' | 'prepare' | 'jobs' | 'demo';
+// The top tabs. Interview shows the current candidate's page; from Upcoming and Jobs you can open anyone's
+// page to look at it. The demo is a page, not a tab.
+export type Tab = 'interview' | 'upcoming' | 'jobs';
 
-// Moves to a tab with a job or candidate already chosen (panel.ts passes it to each view as onGo).
-export type GoTo = (tab: Tab, opts?: { jobId?: string | null; candidateId?: string; addCandidate?: boolean }) => void;
+// The parts of a candidate's page.
+export type Section = 'plan' | 'interview' | 'notes';
+
+// Moving around the panel. panel.ts makes it and hands it to each view.
+export interface Nav {
+  tab(tab: Tab): void;
+  job(jobId: string): void;
+  // Opens someone's page to look at it (the Interview tab, if they're the current candidate).
+  candidate(candidateId: string, section?: Section): void;
+  // Makes them the current candidate and shows the Interview tab.
+  interviewWith(candidateId: string): void;
+  addJob(): void;
+  addCandidate(jobId: string): void;
+  editCandidate(candidateId: string): void;
+  demo(): void;
+}
 
 // The element with this id in panel.html. Say which kind when you need its fields: $<HTMLInputElement>('setToken').
 export const $ = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;

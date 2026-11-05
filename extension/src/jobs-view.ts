@@ -1,5 +1,5 @@
 // Jobs tab: every job you're hiring for, each with its required skills and its candidates.
-import { $, el, toast, openSheet, confirmSheet, formatDate, fileToBase64, withBusy, closestTarget, errorMessage, type GoTo } from './ui.ts';
+import { $, el, toast, openSheet, confirmSheet, formatDate, fileToBase64, withBusy, closestTarget, errorMessage, type Nav } from './ui.ts';
 import { getState, commit, subscribe } from './data.ts';
 import { api } from './api.ts';
 import * as S from './store.ts';
@@ -14,10 +14,9 @@ const input = (id: string) => $<HTMLInputElement>(id);
 const textarea = (id: string) => $<HTMLTextAreaElement>(id);
 const dialog = (id: string) => $<HTMLDialogElement>(id);
 
-// Other tabs ask to show something here (e.g. "Add a job" from an empty Live tab).
-let goTo: GoTo = () => {};
-export function initJobs({ onGo }: { onGo: GoTo }): void {
-  goTo = onGo;
+let nav: Nav;
+export function initJobs(navigation: Nav): void {
+  nav = navigation;
 
   $('jobsFilter').addEventListener('click', (e) => {
     const btn = closestTarget(e, '[data-v]');
@@ -48,6 +47,12 @@ export function addJob(): void {
 
 export function addCandidateTo(jobId: string): void {
   openCandidateSheet(jobId, null);
+}
+
+// Edit sheet for a candidate, over whatever page is showing (e.g. Edit on their page).
+export function editCandidate(candidateId: string): void {
+  const c = S.getCandidate(getState(), candidateId);
+  if (c) openCandidateSheet(c.jobId, c.id);
 }
 
 function render() {
@@ -191,8 +196,7 @@ function candidateCard(job: S.Job, c: S.Candidate) {
     el(
       'div',
       { class: 'row' },
-      el('button', { class: 'soft-btn', type: 'button', onclick: () => goTo('prepare', { jobId: job.id, candidateId: c.id }) }, 'Prepare'),
-      el('button', { class: 'soft-btn', type: 'button', onclick: () => goTo('live', { jobId: job.id, candidateId: c.id }) }, 'Interview'),
+      el('button', { class: 'soft-btn', type: 'button', onclick: () => nav.candidate(c.id) }, 'Open'),
       el('button', { class: 'link-btn', type: 'button', onclick: () => openCandidateSheet(job.id, c.id) }, 'Edit'),
       el(
         'button',

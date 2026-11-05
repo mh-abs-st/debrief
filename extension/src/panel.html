@@ -17,35 +17,101 @@
     <div class="app">
       <header class="bar">
         <div class="tabs" id="tabs" role="tablist" aria-label="Sections">
-          <button role="tab" id="tab-live" data-tab="live" aria-controls="view-live" aria-selected="true" type="button">Live</button>
-          <button role="tab" id="tab-prepare" data-tab="prepare" aria-controls="view-prepare" aria-selected="false" type="button">Prepare</button>
+          <button role="tab" id="tab-interview" data-tab="interview" aria-controls="view-person" aria-selected="true" type="button">Interview</button>
+          <button role="tab" id="tab-upcoming" data-tab="upcoming" aria-controls="view-upcoming" aria-selected="false" type="button">Upcoming</button>
           <button role="tab" id="tab-jobs" data-tab="jobs" aria-controls="view-jobs" aria-selected="false" type="button">Jobs</button>
-          <button role="tab" id="tab-demo" data-tab="demo" aria-controls="view-demo" aria-selected="false" type="button">Demo</button>
         </div>
         <button class="icon-btn" id="openSettings" type="button" title="Settings" aria-label="Settings"><svg><use href="#i-gear"/></svg></button>
       </header>
 
-      <!-- ============ Live ============ -->
-      <main class="view" id="view-live" role="tabpanel" aria-labelledby="tab-live">
-        <div class="picker" id="livePicker"></div>
-        <section class="empty-state" id="liveEmpty" hidden></section>
+      <!-- ============ Upcoming: who you're interviewing next, across all open jobs ============ -->
+      <main class="view" id="view-upcoming" role="tabpanel" aria-labelledby="tab-upcoming" hidden>
+        <section class="empty-state" id="upEmpty" hidden></section>
+        <div class="stack" id="upGroups"></div>
+      </main>
 
-        <div id="liveBody" hidden>
-          <div class="person">
-            <div>
-              <h2 id="liveName"></h2>
-              <p class="muted" id="liveMeta"></p>
-            </div>
-            <a class="link-btn" id="liveProfile" target="_blank" rel="noopener noreferrer" hidden>Profile ↗</a>
+      <!-- ============ Jobs ============ -->
+      <main class="view" id="view-jobs" role="tabpanel" aria-labelledby="tab-jobs" hidden>
+        <div class="stack" id="jobsListPane">
+          <div class="seg" id="jobsFilter" role="radiogroup" aria-label="Show">
+            <button role="radio" data-v="open" aria-checked="true" type="button">Open</button>
+            <button role="radio" data-v="closed" aria-checked="false" type="button">Closed</button>
+            <button role="radio" data-v="all" aria-checked="false" type="button">All</button>
           </div>
+          <ul class="cards" id="jobsList"></ul>
+          <button class="primary-btn wide" id="jobsAdd" type="button">＋ Add a job</button>
+          <p class="help">Jobs, candidates and notes are saved on this computer only.</p>
+        </div>
 
+        <div class="stack" id="jobPane" hidden>
+          <button class="link-btn back" id="jobBack" type="button"><svg><use href="#i-left"/></svg>All jobs</button>
+          <div>
+            <h2 id="jobTitle"></h2>
+            <p class="muted" id="jobCompany"></p>
+          </div>
+          <div class="row" id="jobActions"></div>
+
+          <section class="card">
+            <h3>Skills checklist</h3>
+            <ul class="skill-list" id="jobSkills"></ul>
+          </section>
+
+          <section class="card">
+            <div class="section-head">
+              <h3>Candidates <span class="muted" id="candCount"></span></h3>
+              <button class="soft-btn small" id="candAdd" type="button">＋ Add</button>
+            </div>
+            <ul class="cards" id="candList"></ul>
+          </section>
+        </div>
+      </main>
+
+      <!-- ============ One candidate: Plan, Interview, Notes ============ -->
+      <!-- The Interview tab shows the current candidate here; Upcoming and Jobs open others here too (with Back). -->
+      <main class="view" id="view-person" role="tabpanel" aria-labelledby="tab-interview">
+        <section class="empty-state" id="nowEmpty" hidden></section>
+        <div class="stack" id="personPage">
+        <button class="link-btn back" id="personBack" type="button"><svg><use href="#i-left"/></svg><span id="personBackLabel">Upcoming</span></button>
+        <div class="person">
+          <div>
+            <h2 id="personName"></h2>
+            <p class="muted" id="personMeta"></p>
+          </div>
+          <div class="row">
+            <a class="link-btn" id="personProfile" target="_blank" rel="noopener noreferrer" hidden>Profile ↗</a>
+            <button class="link-btn" id="personEdit" type="button">Edit</button>
+          </div>
+        </div>
+        <div class="seg" id="personSections" role="tablist" aria-label="Candidate">
+          <button role="tab" id="sec-plan" data-section="plan" aria-controls="section-plan" aria-selected="true" type="button">Plan</button>
+          <button role="tab" id="sec-interview" data-section="interview" aria-controls="section-interview" aria-selected="false" type="button">Interview</button>
+          <button role="tab" id="sec-notes" data-section="notes" aria-controls="section-notes" aria-selected="false" type="button">Notes</button>
+        </div>
+
+        <!-- Plan -->
+        <div class="stack" id="section-plan" role="tabpanel" aria-labelledby="sec-plan">
+          <section class="card">
+            <h3>Interview plan</h3>
+            <p class="help">Reads the resume against the job’s skills and suggests what to ask. No score: you decide after the interview.</p>
+            <ul class="facts" id="prepInputs"></ul>
+            <p class="warn" id="prepMissing" hidden></p>
+            <button class="primary-btn" id="prepMake" type="button">Make interview plan</button>
+          </section>
+          <section class="card plan" id="prepPlan" hidden></section>
+        </div>
+
+        <!-- Interview -->
+        <div class="stack" id="section-interview" role="tabpanel" aria-labelledby="sec-interview" hidden>
+          <!-- Shown instead of the interview when you're looking at someone who isn't the current candidate. -->
+          <section class="card" id="liveSwitchBox" hidden></section>
+          <div class="stack" id="liveArea">
           <section class="card" id="liveStartBox">
             <p>Start when the call begins. You’ll get the job’s checklist, a notes box for each skill, and the live transcript.</p>
             <p class="warn" id="liveNoSkills" hidden>This job has no skills checklist yet. You can still take notes, or add skills in Jobs first.</p>
             <button class="primary-btn" id="liveStart" type="button">Start interview</button>
           </section>
 
-          <div id="liveRun" hidden>
+          <div class="stack" id="liveRun" hidden>
             <section class="card listen">
               <div class="listen-head">
                 <span class="dot" id="liveDot" aria-hidden="true"></span>
@@ -101,66 +167,17 @@
               <button class="primary-btn" id="liveEnd" type="button">End interview</button>
             </div>
           </div>
-
-          <section class="card" id="livePast" hidden>
-            <h3>Past interviews</h3>
-            <ul class="past" id="livePastList"></ul>
-          </section>
-        </div>
-      </main>
-
-      <!-- ============ Prepare ============ -->
-      <main class="view" id="view-prepare" role="tabpanel" aria-labelledby="tab-prepare" hidden>
-        <div class="picker" id="prepPicker"></div>
-        <section class="empty-state" id="prepEmpty" hidden></section>
-        <div id="prepBody" hidden>
-          <section class="card">
-            <h3>Interview plan</h3>
-            <p class="help">Reads the resume against the job’s skills and suggests what to ask. No score: you decide after the interview.</p>
-            <ul class="facts" id="prepInputs"></ul>
-            <p class="warn" id="prepMissing" hidden></p>
-            <button class="primary-btn" id="prepMake" type="button">Make interview plan</button>
-          </section>
-          <section class="card plan" id="prepPlan" hidden></section>
-        </div>
-      </main>
-
-      <!-- ============ Jobs ============ -->
-      <main class="view" id="view-jobs" role="tabpanel" aria-labelledby="tab-jobs" hidden>
-        <div id="jobsListPane">
-          <div class="seg" id="jobsFilter" role="radiogroup" aria-label="Show">
-            <button role="radio" data-v="open" aria-checked="true" type="button">Open</button>
-            <button role="radio" data-v="closed" aria-checked="false" type="button">Closed</button>
-            <button role="radio" data-v="all" aria-checked="false" type="button">All</button>
           </div>
-          <ul class="cards" id="jobsList"></ul>
-          <button class="primary-btn wide" id="jobsAdd" type="button">＋ Add a job</button>
-          <p class="help">Jobs, candidates and notes are saved on this computer only.</p>
         </div>
 
-        <div id="jobPane" hidden>
-          <button class="link-btn back" id="jobBack" type="button"><svg><use href="#i-left"/></svg>All jobs</button>
-          <h2 id="jobTitle"></h2>
-          <p class="muted" id="jobCompany"></p>
-          <div class="row" id="jobActions"></div>
-
-          <section class="card">
-            <h3>Skills checklist</h3>
-            <ul class="skill-list" id="jobSkills"></ul>
-          </section>
-
-          <section class="card">
-            <div class="section-head">
-              <h3>Candidates <span class="muted" id="candCount"></span></h3>
-              <button class="soft-btn small" id="candAdd" type="button">＋ Add</button>
-            </div>
-            <ul class="cards" id="candList"></ul>
-          </section>
+        <!-- Notes: interviews that have ended -->
+        <div class="stack" id="section-notes" role="tabpanel" aria-labelledby="sec-notes" hidden></div>
         </div>
       </main>
 
-      <!-- ============ Demo ============ -->
-      <main class="view" id="view-demo" role="tabpanel" aria-labelledby="tab-demo" hidden>
+      <!-- ============ Demo (from Upcoming when empty, or Settings) ============ -->
+      <main class="view" id="view-demo" aria-label="Demo" hidden>
+        <button class="link-btn back" id="demoBack" type="button"><svg><use href="#i-left"/></svg><span id="demoBackLabel">Back</span></button>
         <section class="card demo-head">
           <p class="muted">A short made-up interview. No call, no AI, nothing saved.</p>
           <h2 id="demoName"></h2>
@@ -189,7 +206,7 @@
         </section>
 
         <details class="card">
-          <summary>The plan made in Prepare</summary>
+          <summary>The interview plan</summary>
           <ul class="plan-list" id="demoPlanList"></ul>
         </details>
       </main>
@@ -294,12 +311,14 @@
         <details class="guide">
           <summary>How to use Debrief</summary>
           <ol>
-            <li><b>Jobs:</b> add a job, paste its description and make the skills checklist. Add each candidate with their profile link and resume.</li>
-            <li><b>Prepare:</b> pick a candidate and make an interview plan: what their resume shows for each skill and what to ask.</li>
-            <li><b>Live:</b> open the call in a Chrome tab, click the Debrief icon on that tab, tell the candidate the call is transcribed, then start. Tick skills as you cover them and write notes.</li>
-            <li><b>After:</b> end the interview and copy your notes. Debrief never scores candidates.</li>
+            <li><b>Jobs:</b> add a job, paste its description and make the skills checklist. Add each candidate with their profile link, interview date and resume.</li>
+            <li><b>Interview</b> (first tab): opens on the interview that’s running, or your next candidate. <b>Upcoming</b> lists everyone due; tap someone to see their page, then “Interview now” to make them current.</li>
+            <li><b>Plan:</b> make an interview plan: what their resume shows for each skill and what to ask.</li>
+            <li><b>Interview:</b> open the call in a Chrome tab, click the Debrief icon on that tab, tell the candidate the call is transcribed, then start. Tick skills as you cover them and write notes.</li>
+            <li><b>Notes:</b> after you end the interview, your notes are kept there to read or copy. Debrief never scores candidates.</li>
           </ol>
         </details>
+        <button class="link-btn" id="setDemo" type="button">Watch a short demo</button>
       </div>
       <div class="sheet-foot">
         <button class="soft-btn" data-close type="button">Cancel</button>

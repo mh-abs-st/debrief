@@ -102,6 +102,59 @@ test('notes export: only what was written, no assessment', () => {
   assert.doesNotMatch(md, /score|rating|fit/i);
 });
 
+test('upcoming groups candidates by interview day, running interviews first', () => {
+  let { state, job } = seed();
+  const add = (name: string, interviewAt: string, stage?: string) => {
+    const r = S.addCandidate(state, job.id, { name, interviewAt, stage });
+    state = r.state;
+    return r.candidate;
+  };
+  add('Today late', '2026-11-05T15:00', 'scheduled');
+  add('Today early', '2026-11-05T09:00', 'scheduled');
+  add('Tomorrow', '2026-11-06T10:00', 'scheduled');
+  add('Last week', '2026-10-29T10:00', 'scheduled');
+  add('Done', '2026-11-05T11:00', 'interviewed');
+  const running = add('Running', '2026-11-04T10:00', 'interviewed');
+  state = S.startInterview(state, running.id).state;
+
+  const g = S.upcoming(state, '2026-11-05');
+  const names = (list: S.Candidate[]) => list.map((c) => c.name);
+  assert.deepEqual(names(g.inProgress), ['Running']);
+  assert.deepEqual(names(g.today), ['Today early', 'Today late']);
+  assert.deepEqual(names(g.later), ['Tomorrow']);
+  assert.deepEqual(names(g.earlier), ['Last week']);
+  assert.deepEqual(names(g.unscheduled), ['Ana', 'Ben']); // seeded without a date
+});
+
+test('upcoming leaves out candidates of closed jobs', () => {
+  let { state, job } = seed();
+  state = S.updateJob(state, job.id, { status: 'closed' });
+  const g = S.upcoming(state, '2026-11-05');
+  assert.equal(Object.values(g).flat().length, 0);
+});
+
+test('current candidate: a running interview first, then your choice, then the next one due', () => {
+  let { state, job, ana, ben } = seed();
+  assert.equal(S.currentCandidateId(state, '2026-11-05'), ''); // nobody has a date yet
+
+  const later = S.addCandidate(state, job.id, { name: 'Later', interviewAt: '2026-11-07T09:00' });
+  const today = S.addCandidate(later.state, job.id, { name: 'Today', interviewAt: '2026-11-05T14:00' });
+  state = today.state;
+  assert.equal(S.currentCandidateId(state, '2026-11-05'), today.candidate.id); // today beats later
+  assert.equal(S.currentCandidateId(state, '2026-11-08'), ''); // both dates passed
+  assert.equal(S.currentCandidateId(state, '2026-11-06'), later.candidate.id);
+
+  assert.equal(S.currentCandidateId(state, '2026-11-05', ben.id), ben.id); // your choice beats the schedule
+  assert.equal(S.currentCandidateId(state, '2026-11-05', 'deleted'), today.candidate.id);
+
+  state = S.startInterview(state, ana.id, 1000).state;
+  assert.equal(S.currentCandidateId(state, '2026-11-05', ben.id), ana.id); // a running interview beats everything
+});
+
+test('localDateKey uses the local calendar day', () => {
+  assert.equal(S.localDateKey(new Date(2026, 0, 5, 23, 30)), '2026-01-05');
+});
+
 test('normalize repairs missing or damaged stored data', () => {
   assert.deepEqual(S.normalize(null), S.emptyState());
   assert.deepEqual(S.normalize({ jobs: 'x' }), S.emptyState());

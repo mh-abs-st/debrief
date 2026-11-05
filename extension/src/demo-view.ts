@@ -1,4 +1,4 @@
-// Demo tab: plays a scripted interview so people can see Debrief without a call, an account or a job.
+// Demo page: plays a scripted interview so people can see Debrief without a call, an account or a job.
 // Uses only demo-script.js. It never reads or changes your real jobs, candidates or notes.
 import { $, el } from './ui.ts';
 import { DEMO_JOB, DEMO_CANDIDATE, DEMO_PLAN, DEMO_LENGTH_MS, demoAt, type DemoFrame } from './demo-script.ts';
@@ -6,7 +6,9 @@ import { DEMO_JOB, DEMO_CANDIDATE, DEMO_PLAN, DEMO_LENGTH_MS, demoAt, type DemoF
 let timer: ReturnType<typeof setInterval> | undefined;
 let startedAt = 0;
 
-export function initDemo(): void {
+// onBack returns to the tab the demo was opened from.
+export function initDemo({ onBack }: { onBack: () => void }): void {
+  $('demoBack').addEventListener('click', onBack);
   $('demoJob').textContent = `${DEMO_JOB.title} · ${DEMO_JOB.company}`;
   $('demoName').textContent = DEMO_CANDIDATE.name;
   $('demoPlay').addEventListener('click', play);
@@ -14,7 +16,7 @@ export function initDemo(): void {
   draw(demoAt(-1));
 }
 
-// Stops the demo when you leave the tab.
+// Stops the demo when you leave the page.
 export function stopDemo(): void {
   clearInterval(timer);
   timer = undefined;

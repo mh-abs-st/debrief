@@ -1,72 +1,41 @@
-// Prepare tab: an interview plan for one candidate, from the job's skills and their resume.
+// Plan section of a candidate's page: an interview plan from the job's skills and their resume.
 // Not a resume match: no score, no fit label, no ranking. It lists what the resume shows and what to ask.
-import { $, el, toast, withBusy, errorMessage, type GoTo } from './ui.ts';
-import { getState, commit, subscribe } from './data.ts';
+import { $, el, toast, withBusy, errorMessage, type Nav } from './ui.ts';
+import { getState, commit } from './data.ts';
 import { api } from './api.ts';
-import { createPicker, type Picker } from './picker.ts';
 import * as S from './store.ts';
 
-let picker: Picker;
-let goTo: GoTo = () => {};
+let nav: Nav;
+let candidateId = '';
 
-export function initPrepare({ onGo }: { onGo: GoTo }): void {
-  goTo = onGo;
-  picker = createPicker($('prepPicker'), { onChange: render });
+export function initPlan(navigation: Nav): void {
+  nav = navigation;
   $('prepMake').addEventListener('click', (e) => makePlan(e.currentTarget as HTMLButtonElement));
-  subscribe(() => {
-    picker.refresh();
-    render();
-  });
-  picker.refresh();
-  render();
 }
 
-export function selectForPrepare(jobId: string | null | undefined, candidateId: string | null | undefined): void {
-  picker.set(jobId, candidateId);
-  render();
-}
-
-function render() {
+// Shows the plan for this candidate. candidate-view calls it on open and after every change.
+export function renderPlanSection(id: string): void {
+  candidateId = id;
   const state = getState();
-  const { jobId, candidateId } = picker.get();
-  const job = S.getJob(state, jobId);
-  const cand = S.getCandidate(state, candidateId);
-
-  const empty = $('prepEmpty');
-  const body = $('prepBody');
-  if (!job || !cand) {
-    body.hidden = true;
-    empty.hidden = false;
-    empty.replaceChildren(
-      el('p', {}, !state.jobs.length ? 'Add a job and a candidate first.' : 'Add a candidate to this job first.'),
-      el('button', { class: 'primary-btn', type: 'button', onclick: () => goTo('jobs', { jobId: job?.id }) }, 'Go to Jobs'),
-    );
-    return;
-  }
-  empty.hidden = true;
-  body.hidden = false;
+  const cand = S.getCandidate(state, id);
+  const job = cand && S.getJob(state, cand.jobId);
+  if (!cand || !job) return;
 
   // What the plan will use, and what's missing.
   const missing: string[] = [];
   if (!job.skills.length) missing.push('the job’s skills checklist');
   if (!cand.resumeText) missing.push('the candidate’s resume');
-  const inputs = $('prepInputs');
-  inputs.replaceChildren(
+  $('prepInputs').replaceChildren(
     el('li', {}, el('b', {}, 'Job: '), S.jobLabel(job), ` · ${job.skills.length} skills`),
-    el(
-      'li',
-      {},
-      el('b', {}, 'Resume: '),
-      cand.resumeText ? `${cand.resumeText.split(/\s+/).length} words` : 'not added',
-      cand.profileUrl ? ' · ' : '',
-      cand.profileUrl ? el('a', { class: 'profile-link', href: cand.profileUrl, target: '_blank', rel: 'noopener noreferrer' }, 'Open profile ↗') : null,
-    ),
+    el('li', {}, el('b', {}, 'Resume: '), cand.resumeText ? `${cand.resumeText.split(/\s+/).length} words` : 'not added'),
   );
   const note = $('prepMissing');
   note.hidden = !missing.length;
   note.replaceChildren(
     `Add ${missing.join(' and ')} first. `,
-    el('button', { class: 'link-btn inline', type: 'button', onclick: () => goTo('jobs', { jobId: job.id }) }, 'Open the job'),
+    !job.skills.length
+      ? el('button', { class: 'link-btn inline', type: 'button', onclick: () => nav.job(job.id) }, 'Open the job')
+      : el('button', { class: 'link-btn inline', type: 'button', onclick: () => nav.editCandidate(cand.id) }, 'Add the resume'),
   );
   const make = $<HTMLButtonElement>('prepMake');
   make.disabled = missing.length > 0;
@@ -121,7 +90,6 @@ function renderPlan(cand: S.Candidate) {
 
 async function makePlan(button: HTMLButtonElement) {
   const state = getState();
-  const { candidateId } = picker.get();
   const cand = S.getCandidate(state, candidateId);
   const job = cand && S.getJob(state, cand.jobId);
   if (!cand || !job) return;
@@ -135,7 +103,7 @@ async function makePlan(button: HTMLButtonElement) {
         resumeText: cand.resumeText,
       });
       await commit(S.updateCandidate(getState(), cand.id, { plan }));
-      toast('Plan ready. You’ll also see it during the interview.');
+      toast('Plan ready. You’ll also see it in Interview.');
     } catch (err) {
       toast(errorMessage(err), { error: true });
     }

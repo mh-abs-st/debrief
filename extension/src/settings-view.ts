@@ -1,13 +1,13 @@
 // Settings sheet: server connection, transcription language, theme, how long candidate data is kept,
 // and deleting everything.
-import { $, toast, openSheet, confirmSheet, closestTarget } from './ui.ts';
+import { $, toast, openSheet, confirmSheet, closestTarget, type Nav } from './ui.ts';
 import { getSettings, saveSettings, deleteAll, getState, type Theme } from './data.ts';
 
 const input = (id: string) => $<HTMLInputElement>(id);
 const select = (id: string) => $<HTMLSelectElement>(id);
 const sheet = () => $<HTMLDialogElement>('settingsSheet');
 
-export function initSettings(): void {
+export function initSettings(nav: Nav): void {
   $('openSettings').addEventListener('click', open);
   $('setSave').addEventListener('click', save);
   $('setTheme').addEventListener('click', (e) => {
@@ -16,6 +16,10 @@ export function initSettings(): void {
     markTheme(btn.dataset.v || 'system');
   });
   $('setDeleteAll').addEventListener('click', removeEverything);
+  $('setDemo').addEventListener('click', () => {
+    sheet().close();
+    nav.demo();
+  });
 }
 
 function open() {
