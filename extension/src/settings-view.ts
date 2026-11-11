@@ -45,7 +45,7 @@ async function save() {
   const server = input('setServer').value.trim().replace(/\/+$/, '');
   if (server && !/^https?:\/\//.test(server)) return toast('The server address should start with https:// (or http://localhost).', { error: true });
   const theme = asTheme($('setTheme').querySelector<HTMLElement>('[aria-checked="true"]')?.dataset.v);
-  await saveSettings({
+  const saved = await saveSettings({
     serverUrl: server,
     appToken: input('setToken').value.trim(),
     language: select('setLanguage').value,
@@ -53,6 +53,7 @@ async function save() {
     theme,
   });
   applyTheme(theme);
+  if (!saved) return; // the error is on screen; the sheet stays open to try again
   sheet().close();
   toast('Settings saved.');
 }
@@ -77,7 +78,9 @@ async function removeEverything() {
     yes: 'Delete everything',
   });
   if (!ok) return;
-  await deleteAll();
+  if (!(await deleteAll())) {
+    return toast('We couldn’t delete your data. Close and reopen Debrief, then try again.', { error: true });
+  }
   sheet().close();
   toast('All jobs, candidates and notes deleted.' + stoppedNote(listened));
 }

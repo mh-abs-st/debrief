@@ -25,7 +25,7 @@ export function initInterview(options: { onEnd: (candidateId: string) => void })
     const { state } = S.startInterview(getState(), candidateId);
     transcript = emptyTranscript();
     renderTranscript();
-    await commit(state);
+    if (!(await commit(state))) return; // the save failure is on screen; don't start transcribing
     // Listening starts with the interview; it can be stopped and restarted from the listening card.
     await start();
   });
@@ -273,14 +273,14 @@ async function endInterview() {
   if (!ok) return;
   stopListening();
   onEnd(candidateId);
-  await commit(S.endInterview(getState(), iv.id));
+  const saved = await commit(S.endInterview(getState(), iv.id));
   transcript = emptyTranscript();
   renderTranscript();
   $('liveSuggestions').replaceChildren();
   textarea('liveAnswer').value = '';
   input('liveQuestion').value = '';
   updateListenButtons();
-  toast('Interview ended. Your notes are under Notes.');
+  if (saved) toast('Interview ended. Your notes are under Notes.');
 }
 
 export async function copy(text: string, done: string): Promise<void> {
