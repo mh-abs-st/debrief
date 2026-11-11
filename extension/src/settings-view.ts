@@ -2,6 +2,7 @@
 // and deleting everything.
 import { $, toast, openSheet, confirmSheet, closestTarget, type Nav } from './ui.ts';
 import { getSettings, saveSettings, deleteAll, getState, type Theme } from './data.ts';
+import { listeningCandidate, stoppedNote } from './interview-view.ts';
 
 const input = (id: string) => $<HTMLInputElement>(id);
 const select = (id: string) => $<HTMLSelectElement>(id);
@@ -67,13 +68,16 @@ export function applyTheme(theme: Theme): void {
 
 async function removeEverything() {
   const { jobs, candidates } = getState();
+  const listened = listeningCandidate();
   const ok = await confirmSheet({
     title: 'Delete all data?',
-    body: `This deletes ${jobs.length} job${jobs.length === 1 ? '' : 's'} and ${candidates.length} candidate${candidates.length === 1 ? '' : 's'}, with their resumes, plans and notes, from this computer. Your settings stay. This can’t be undone.`,
+    body:
+      `This deletes ${jobs.length} job${jobs.length === 1 ? '' : 's'} and ${candidates.length} candidate${candidates.length === 1 ? '' : 's'}, with their resumes, plans and notes, from this computer. Your settings stay. This can’t be undone.` +
+      (listened ? ' Debrief stops listening to the call.' : ''),
     yes: 'Delete everything',
   });
   if (!ok) return;
   await deleteAll();
   sheet().close();
-  toast('All jobs, candidates and notes deleted.');
+  toast('All jobs, candidates and notes deleted.' + stoppedNote(listened));
 }

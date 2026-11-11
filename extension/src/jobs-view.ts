@@ -2,6 +2,7 @@
 import { $, el, toast, openSheet, confirmSheet, formatDate, fileToBase64, withBusy, closestTarget, errorMessage, type Nav } from './ui.ts';
 import { getState, commit, subscribe } from './data.ts';
 import { api } from './api.ts';
+import { listeningCandidate, stoppedNote } from './interview-view.ts';
 import * as S from './store.ts';
 
 let filter = 'open';
@@ -129,15 +130,18 @@ function renderJob(job: S.Job) {
         type: 'button',
         onclick: async () => {
           const count = S.candidatesFor(getState(), job.id).length;
+          const listened = listeningCandidate();
+          const listening = S.getCandidate(getState(), listened)?.jobId === job.id;
           const ok = await confirmSheet({
             title: 'Delete this job?',
-            body: count
-              ? `This also deletes its ${count} candidate${count === 1 ? '' : 's'}, their resumes, plans and interview notes. This can’t be undone.`
-              : 'This can’t be undone.',
+            body:
+              (count
+                ? `This also deletes its ${count} candidate${count === 1 ? '' : 's'}, their resumes, plans and interview notes. This can’t be undone.`
+                : 'This can’t be undone.') + (listening ? ' Debrief stops listening to the call.' : ''),
           });
           if (!ok) return;
           await commit(S.removeJob(getState(), job.id));
-          toast('Job deleted.');
+          toast('Job deleted.' + stoppedNote(listened));
         },
       },
       'Delete',
@@ -204,13 +208,16 @@ function candidateCard(job: S.Job, c: S.Candidate) {
           class: 'link-btn danger',
           type: 'button',
           onclick: async () => {
+            const listened = listeningCandidate();
             const ok = await confirmSheet({
               title: `Delete ${c.name}?`,
-              body: 'This deletes their profile link, resume, plan and interview notes from this computer. This can’t be undone.',
+              body:
+                'This deletes their profile link, resume, plan and interview notes from this computer. This can’t be undone.' +
+                (listened === c.id ? ' Debrief stops listening to the call.' : ''),
             });
             if (!ok) return;
             await commit(S.removeCandidate(getState(), c.id));
-            toast('Candidate deleted.');
+            toast('Candidate deleted.' + stoppedNote(listened));
           },
         },
         'Delete',
