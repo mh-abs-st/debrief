@@ -1,7 +1,7 @@
 // Interview section of a candidate's page: the interview itself. Checklist and notes, the live transcript,
 // follow-up suggestions and the questions from the plan.
 import { $, el, toast, confirmSheet, fillSelect, withBusy, errorMessage } from './ui.ts';
-import { getState, getSettings, commit, commitSoon } from './data.ts';
+import { getState, getSettings, commit, commitSoon, subscribe } from './data.ts';
 import { api } from './api.ts';
 import { startListening, type Listening } from './capture.ts';
 import { emptyTranscript, recentText, transcriptText } from './transcript.ts';
@@ -54,8 +54,27 @@ export function initInterview(options: { onEnd: (candidateId: string) => void })
     copy(text, 'Transcript copied.');
   });
   $('liveEnd').addEventListener('click', endInterview);
+  // Deleting a candidate (or their job, or everything) from any tab: stop transcribing their call and drop
+  // what was heard. This page may not be on screen, so it can't wait for its next render.
+  subscribe((state) => {
+    if (listeningFor && !exists(state, listeningFor)) stopListening();
+    if (candidateId && !exists(state, candidateId) && (transcript.lines.length || transcript.interim)) {
+      transcript = emptyTranscript();
+      renderTranscript();
+    }
+  });
   renderTranscript();
 }
+
+const exists = (state: S.State, id: string): boolean => {
+  const cand = S.getCandidate(state, id);
+  return Boolean(cand && S.getJob(state, cand.jobId));
+};
+
+// For the toast after a delete: what to add when that delete stopped listening.
+// wasListening is listeningCandidate() from just before the delete.
+export const stoppedNote = (wasListening: string): string =>
+  wasListening && !listening ? ' Stopped listening and cleared the transcript.' : '';
 
 // Shows the interview for this candidate. candidate-view calls it on open and after every change.
 // Opening a different candidate stops listening: never keep transcribing a call you moved away from.
@@ -194,6 +213,13 @@ async function start() {
         }
       },
     });
+    // Deleted while listening was starting up.
+    if (!exists(getState(), listeningFor)) {
+      stopListening();
+      transcript = emptyTranscript();
+      renderTranscript();
+      toast('Stopped listening: that candidate was deleted.');
+    }
   } catch (err) {
     listening = null;
     listeningFor = '';
