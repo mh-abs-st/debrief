@@ -117,7 +117,7 @@ function renderJob(job: S.Job) {
         class: 'soft-btn',
         type: 'button',
         onclick: async () => {
-          await commit(S.updateJob(getState(), job.id, { status: job.status === 'open' ? 'closed' : 'open' }));
+          if (!(await commit(S.updateJob(getState(), job.id, { status: job.status === 'open' ? 'closed' : 'open' })))) return;
           toast(job.status === 'open' ? 'Job closed.' : 'Job reopened.');
         },
       },
@@ -140,7 +140,7 @@ function renderJob(job: S.Job) {
                 : 'This can’t be undone.') + (listening ? ' Debrief stops listening to the call.' : ''),
           });
           if (!ok) return;
-          await commit(S.removeJob(getState(), job.id));
+          if (!(await commit(S.removeJob(getState(), job.id)))) return;
           toast('Job deleted.' + stoppedNote(listened));
         },
       },
@@ -216,7 +216,7 @@ function candidateCard(job: S.Job, c: S.Candidate) {
                 (listened === c.id ? ' Debrief stops listening to the call.' : ''),
             });
             if (!ok) return;
-            await commit(S.removeCandidate(getState(), c.id));
+            if (!(await commit(S.removeCandidate(getState(), c.id)))) return;
             toast('Candidate deleted.' + stoppedNote(listened));
           },
         },
@@ -311,13 +311,17 @@ function wireJobSheet() {
       skills: draftSkills,
     };
     if (!fields.title.trim()) return toast('Add the job title.', { error: true });
+    // If the save fails, the sheet stays open so you can try again.
     if (editingJobId) {
-      await commit(S.updateJob(getState(), editingJobId, fields));
+      if (!(await commit(S.updateJob(getState(), editingJobId, fields)))) return;
       toast('Job saved.');
     } else {
       const { state, job } = S.addJob(getState(), fields);
       openJobId = job.id;
-      await commit(state);
+      if (!(await commit(state))) {
+        editingJobId = job.id; // it's in memory now: trying again saves it rather than adding a second one
+        return;
+      }
       toast('Job added. Now add your candidates.');
     }
     dialog('jobSheet').close();
@@ -378,11 +382,14 @@ function wireCandidateSheet() {
     if (fields.interviewAt && !editingCandidate.id) fields.stage = 'scheduled';
     try {
       if (editingCandidate.id) {
-        await commit(S.updateCandidate(getState(), editingCandidate.id, fields));
+        if (!(await commit(S.updateCandidate(getState(), editingCandidate.id, fields)))) return; // sheet stays open
         toast('Candidate saved.');
       } else {
-        const { state } = S.addCandidate(getState(), editingCandidate.jobId, fields);
-        await commit(state);
+        const { state, candidate } = S.addCandidate(getState(), editingCandidate.jobId, fields);
+        if (!(await commit(state))) {
+          editingCandidate.id = candidate.id; // it's in memory now: trying again saves it rather than adding a second one
+          return;
+        }
         toast('Candidate added.');
       }
       dialog('candidateSheet').close();
