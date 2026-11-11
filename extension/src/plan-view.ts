@@ -102,7 +102,7 @@ async function makePlan(button: HTMLButtonElement) {
         skills: job.skills,
         resumeText: cand.resumeText,
       });
-      await commit(S.updateCandidate(getState(), cand.id, { plan }));
+      if (!(await commit(S.updateCandidate(getState(), cand.id, { plan })))) return;
       toast('Plan ready. You’ll also see it in Interview.');
     } catch (err) {
       toast(errorMessage(err), { error: true });

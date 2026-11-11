@@ -1,7 +1,7 @@
 // Side panel entry: loads saved data, wires the tabs (Interview, Upcoming, Jobs), candidate pages, the demo
 // and Settings, and remembers where you were so reopening the panel brings you back there.
 import { $, toast, closestTarget, type Nav, type Section, type Tab } from './ui.ts';
-import { load, getSettings, getState } from './data.ts';
+import { load, getSettings, getState, onSaveError, saveErrorMessage } from './data.ts';
 import { initUpcoming, renderUpcoming } from './upcoming-view.ts';
 import { initJobs, showJob, addJob, addCandidateTo, editCandidate } from './jobs-view.ts';
 import { initCandidate, showCurrent, showSection, browseCandidate, hideCandidatePage, shownCandidate, shownSection, shownMode, isSection } from './candidate-view.ts';
@@ -105,6 +105,7 @@ const nav: Nav & { tab(next: Tab, section?: Section): void } = {
 };
 
 async function main() {
+  onSaveError((err) => toast(saveErrorMessage(err), { error: true }));
   const { removed } = await load();
   applyTheme(getSettings().theme);
 
