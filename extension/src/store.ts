@@ -428,3 +428,144 @@ export function interviewMarkdown(state: State, interviewId: string): string {
   if (iv.generalNotes.trim()) lines.push('## Other notes', '', iv.generalNotes.trim(), '');
   return lines.join('\n').trimEnd() + '\n';
 }
+
+// ---------- Backup and restore ----------
+// A backup is one JSON file with all jobs, candidates, plans and notes. Settings are left out: they hold
+// the app token. Restoring checks every field, because the file could have been edited or damaged.
+
+export const BACKUP_APP = 'debrief';
+export const BACKUP_VERSION = 1;
+
+export interface Backup {
+  app: typeof BACKUP_APP;
+  version: number;
+  exportedAt: string;
+  note: string;
+  data: State;
+}
+
+export function makeBackup(state: State, now: number = Date.now()): Backup {
+  return {
+    app: BACKUP_APP,
+    version: BACKUP_VERSION,
+    exportedAt: new Date(now).toISOString(),
+    note: 'Debrief backup. Contains candidate data (resumes, plans, interview notes): keep it safe and delete it when you no longer need it.',
+    data: state,
+  };
+}
+
+export const backupFileName = (now: number = Date.now()): string => `debrief-backup-${new Date(now).toISOString().slice(0, 10)}.json`;
+
+type Obj = Record<string, unknown>;
+const isObj = (v: unknown): v is Obj => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+const time = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0);
+const strings = (v: unknown, each: number, max: number): string[] => list(v).map((x) => clip(x, each)).filter(Boolean).slice(0, max);
+
+function restorePlan(raw: unknown): Plan | null {
+  if (!isObj(raw)) return null;
+  const plan: Plan = {
+    opening: clip(raw.opening, 1000),
+    skills: list(raw.skills)
+      .filter(isObj)
+      .map((s) => ({ name: clip(s.name, 80), resumeShows: clip(s.resumeShows, 1000), askAbout: clip(s.askAbout, 1000), questions: strings(s.questions, 500, 10) }))
+      .filter((s) => s.name)
+      .slice(0, 20),
+    verify: list(raw.verify)
+      .filter(isObj)
+      .map((v) => ({ claim: clip(v.claim, 500), question: clip(v.question, 500) }))
+      .filter((v) => v.claim || v.question)
+      .slice(0, 20),
+  };
+  if (Array.isArray(raw.madeFromSkills)) plan.madeFromSkills = strings(raw.madeFromSkills, 80, 20);
+  return plan;
+}
+
+// Reads a backup file's text. Returns the cleaned data, or an error to show as it is.
+// skipped counts entries left out because they were damaged or belonged to nothing.
+// A missing date becomes now, so retention doesn't delete what was just restored.
+export function readBackup(text: string, now: number = Date.now()): { state: State; skipped: number; exportedAt: string } | { error: string } {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return { error: 'That file isn’t a Debrief backup. Choose the .json file you downloaded from Debrief.' };
+  }
+  if (!isObj(raw) || raw.app !== BACKUP_APP || !isObj(raw.data)) {
+    return { error: 'That file isn’t a Debrief backup. Choose the .json file you downloaded from Debrief.' };
+  }
+  if (typeof raw.version !== 'number' || raw.version > BACKUP_VERSION) {
+    return { error: 'That backup is from a newer version of Debrief. Update Debrief, then try again.' };
+  }
+  const data = raw.data;
+  let skipped = 0;
+  const seen = new Set<string>();
+  const firstTime = (id: string) => (seen.has(id) ? false : (seen.add(id), true));
+
+  const jobs: Job[] = [];
+  for (const j of list(data.jobs)) {
+    const id = isObj(j) ? clip(j.id, 80) : '';
+    if (!isObj(j) || !id || !firstTime(id)) {
+      skipped++;
+      continue;
+    }
+    jobs.push({
+      id,
+      title: clip(j.title, LIMITS.title) || 'Untitled job',
+      company: clip(j.company, LIMITS.company),
+      description: clip(j.description, LIMITS.description),
+      skills: cleanSkills(j.skills),
+      status: j.status === 'closed' ? 'closed' : 'open',
+      createdAt: time(j.createdAt) || now,
+      updatedAt: time(j.updatedAt) || now,
+    });
+  }
+  const jobIds = new Set(jobs.map((j) => j.id));
+
+  const candidates: Candidate[] = [];
+  for (const c of list(data.candidates)) {
+    const id = isObj(c) ? clip(c.id, 80) : '';
+    if (!isObj(c) || !id || !jobIds.has(String(c.jobId)) || !firstTime(id)) {
+      skipped++;
+      continue;
+    }
+    candidates.push({
+      id,
+      jobId: String(c.jobId),
+      name: clip(c.name, LIMITS.name) || 'Unnamed candidate',
+      email: clip(c.email, LIMITS.email),
+      profileUrl: cleanUrl(c.profileUrl), // only http(s): a javascript: link in a file is dropped
+      resumeText: clip(c.resumeText, LIMITS.resume),
+      stage: isStage(c.stage) ? c.stage : 'new',
+      interviewAt: clip(c.interviewAt, 40),
+      plan: restorePlan(c.plan),
+      createdAt: time(c.createdAt) || now,
+      updatedAt: time(c.updatedAt) || now,
+    });
+  }
+  const candidateJob = new Map(candidates.map((c) => [c.id, c.jobId]));
+
+  const interviews: Interview[] = [];
+  for (const iv of list(data.interviews)) {
+    const id = isObj(iv) ? clip(iv.id, 80) : '';
+    const jobId = isObj(iv) ? candidateJob.get(String(iv.candidateId)) : undefined;
+    if (!isObj(iv) || !id || !jobId || !firstTime(id)) {
+      skipped++;
+      continue;
+    }
+    interviews.push({
+      id,
+      jobId,
+      candidateId: String(iv.candidateId),
+      startedAt: time(iv.startedAt) || now,
+      endedAt: time(iv.endedAt) || null,
+      skills: list(iv.skills)
+        .filter(isObj)
+        .map((s) => ({ name: clip(s.name, 80), why: clip(s.why, 200), covered: s.covered === true, notes: clip(s.notes, LIMITS.notes) }))
+        .filter((s) => s.name)
+        .slice(0, 20),
+      generalNotes: clip(iv.generalNotes, LIMITS.notes),
+    });
+  }
+  return { state: { jobs, candidates, interviews }, skipped, exportedAt: clip(raw.exportedAt, 40) };
+}
