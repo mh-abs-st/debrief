@@ -91,3 +91,35 @@ test('delete all: if storage can’t be cleared, the data is kept and it says so
   assert.equal(D.getState().jobs.length, 0);
   assert.equal(stored.debriefData, undefined);
 });
+
+test('notes held back by commitSoon are saved at once by savePendingNow (panel closing)', async () => {
+  D.commitSoon(withJob());
+  assert.equal(stored.debriefData && (stored.debriefData as { jobs: unknown[] }).jobs.length, 0); // not yet: 400 ms
+  assert.equal(await D.savePendingNow(), true);
+  assert.equal((stored.debriefData as { jobs: unknown[] }).jobs.length, 1);
+  assert.equal(await D.savePendingNow(), true); // nothing waiting now
+});
+
+test('savePendingNow with nothing waiting writes nothing', async () => {
+  failWith = new Error('should not be called');
+  assert.equal(await D.savePendingNow(), true);
+  assert.deepEqual(reported, []);
+});
+
+test('savePendingNow reports a failed save, and the timer doesn\'t save it again', async () => {
+  D.commitSoon(withJob());
+  failWith = new Error('IO error');
+  assert.equal(await D.savePendingNow(), false);
+  assert.equal(reported.length, 1);
+  await new Promise((r) => setTimeout(r, 450));
+  assert.equal(reported.length, 1); // the 400 ms timer was cancelled
+});
+
+test('a commit cancels the pending commitSoon save', async () => {
+  D.commitSoon(withJob());
+  await D.commit(D.getState(), { quiet: true });
+  failWith = new Error('should not be called');
+  assert.equal(await D.savePendingNow(), true);
+  await new Promise((r) => setTimeout(r, 450));
+  assert.deepEqual(reported, []);
+});

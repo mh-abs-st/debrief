@@ -1,7 +1,7 @@
 // Side panel entry: loads saved data, wires the tabs (Interview, Upcoming, Jobs), candidate pages, the demo
 // and Settings, and remembers where you were so reopening the panel brings you back there.
 import { $, toast, closestTarget, type Nav, type Section, type Tab } from './ui.ts';
-import { load, getSettings, getState, onSaveError, saveErrorMessage } from './data.ts';
+import { load, getSettings, getState, onSaveError, saveErrorMessage, savePendingNow } from './data.ts';
 import { initUpcoming, renderUpcoming } from './upcoming-view.ts';
 import { initJobs, showJob, addJob, addCandidateTo, editCandidate } from './jobs-view.ts';
 import { initCandidate, showCurrent, showSection, browseCandidate, hideCandidatePage, shownCandidate, shownSection, shownMode, isSection } from './candidate-view.ts';
@@ -145,6 +145,13 @@ async function main() {
   // Closing the panel stops listening (the browser ends the audio anyway); say so if it was on.
   window.addEventListener('beforeunload', (e) => {
     if (isListening()) e.preventDefault();
+  });
+
+  // Notes are saved 400 ms after typing stops. Closing or hiding the panel saves them at once,
+  // so the last words typed before closing aren't lost.
+  window.addEventListener('pagehide', () => void savePendingNow());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') void savePendingNow();
   });
 }
 
