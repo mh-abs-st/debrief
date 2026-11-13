@@ -78,6 +78,18 @@ export async function startListening({ tabId, language = 'en', transcript: initi
     ctx.close().catch(() => {});
   }
 
+  // The tab's audio ends when the tab closes (or Chrome stops the capture): stop and say so.
+  tabStream.getAudioTracks().forEach((track) =>
+    track.addEventListener('ended', () => {
+      if (stopped) return;
+      stopped = true;
+      if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'CloseStream' }));
+      ws.close();
+      cleanup();
+      onStatus('Stopped listening: the call tab was closed or its sound stopped.', true);
+    }),
+  );
+
   ws.onopen = () => {
     recorder = new MediaRecorder(tabStream, { mimeType: mime, audioBitsPerSecond: 64000 });
     recorder.ondataavailable = (e) => {

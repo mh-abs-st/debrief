@@ -22,6 +22,12 @@
           <button role="tab" id="tab-jobs" data-tab="jobs" aria-controls="view-jobs" aria-selected="false" type="button">Jobs</button>
         </div>
         <button class="icon-btn" id="openSettings" type="button" title="Settings" aria-label="Settings"><svg><use href="#i-gear"/></svg></button>
+        <!-- Shown on every page while the call is being transcribed. -->
+        <div class="live-band" id="liveBand" hidden>
+          <span class="dot on" aria-hidden="true"></span>
+          <button class="live-band-open" id="liveBandOpen" type="button" title="Open this interview">Listening to the call<span id="liveBandName"></span></button>
+          <button class="live-band-stop" id="liveBandStop" type="button">Stop</button>
+        </div>
       </header>
 
       <!-- ============ Upcoming: who you're interviewing next, across all open jobs ============ -->

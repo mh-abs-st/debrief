@@ -120,6 +120,7 @@ async function main() {
       chosen = '';
       showSection('notes');
     },
+    openCandidate: (id) => nav.candidate(id, 'interview'),
   });
   initCandidate(nav, { current, onChange: remember });
   initDemo({ onBack: () => nav.tab(tab) });

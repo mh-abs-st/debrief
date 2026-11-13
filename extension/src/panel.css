@@ -88,6 +88,24 @@ p { margin: 0 0 8px; }
   background: var(--surface);
   border-bottom: 1px solid var(--line);
 }
+/* Listening band: a full-width row inside the sticky top bar, on every page. */
+.bar { flex-wrap: wrap; }
+.live-band {
+  flex: 0 0 calc(100% + 20px); display: flex; align-items: center; gap: 8px; margin: 0 -10px -8px; padding: 6px 10px;
+  background: color-mix(in srgb, var(--live) 12%, var(--surface)); border-top: 1px solid color-mix(in srgb, var(--live) 35%, transparent);
+}
+.live-band[hidden] { display: none; }
+.live-band-open {
+  flex: 1; min-width: 0; border: 0; background: none; padding: 2px 0; text-align: left; cursor: pointer;
+  color: var(--text); font: inherit; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.live-band-open:hover { text-decoration: underline; }
+.live-band-stop {
+  flex: none; border: 1px solid var(--live); background: var(--surface); color: var(--live); font: inherit; font-weight: 600;
+  padding: 3px 10px; border-radius: 7px; cursor: pointer;
+}
+.live-band-stop:hover { background: color-mix(in srgb, var(--live) 10%, var(--surface)); }
+.live-band button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .tabs { display: flex; gap: 2px; flex: 1; background: var(--raise); border-radius: 9px; padding: 3px; }
 .tabs [role='tab'] {
   flex: 1; border: 0; background: transparent; padding: 6px 4px; border-radius: 7px;
