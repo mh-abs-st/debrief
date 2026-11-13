@@ -2,7 +2,7 @@
 
 A Chrome side-panel assistant for interviewers at small companies and agencies. Keep your jobs and candidates in one place, prepare questions from each resume, take structured notes during the call, and get follow-up questions from what the candidate just said. It supports the interviewer's judgement and never makes the decision.
 
-**Status:** MVP. Every page works with a fake server in a browser test. Not yet tried on a real call or against the live AI and speech services; see the To-Do in `docs/scope.md` and [GitHub Issues](https://github.com/mh-abs-st/debrief/issues).
+**Status:** MVP. Every page works with a fake server in a browser test. Not yet tried on a real call or against the live AI and speech services; see `docs/plan.md` for the plan, and the To-Do in `docs/scope.md` and [GitHub Issues](https://github.com/mh-abs-st/debrief/issues).
 
 ## How it's organised
 
@@ -40,7 +40,7 @@ Everything is TypeScript. The server and the tests run the `.ts` files directly 
   - `capture.ts`: records the call tab and streams audio straight to Deepgram.
 - `server/`: Node backend (Node 22.18+). No runtime npm dependencies: the built-in HTTP server and `fetch`. TypeScript is a dev dependency, for type checking only.
   - `lib/app.ts`: routes, auth, CORS. `lib/prompts.ts`: skills and follow-up prompts. `lib/plan.ts`: the interview plan prompt and output cleaning. `lib/resume.ts`: reading PDF resumes. `lib/claude.ts`: Anthropic client. `lib/deepgram.ts`: short-lived speech keys. `lib/aierrors.ts`: adapted from Offro for friendly errors.
-- `docs/`: `scope.md` (MVP, compliance, next steps) and `DECISIONS.md` (why things are the way they are).
+- `docs/`: `plan.md` (business and product plan: customers, pricing, phases and gates), `scope.md` (MVP, compliance, next steps) and `DECISIONS.md` (why things are the way they are).
 
 ## Run it locally
 
