@@ -6,6 +6,7 @@
   "description": "Chrome extension for Debrief. Sources in src/, built into dist/ (load dist/ unpacked). The pure logic modules are tested in Node, which runs the .ts files directly.",
   "scripts": {
     "build": "node build.ts",
+    "package": "node scripts/package.ts",
     "watch": "node build.ts --watch",
     "test": "node --test \"test/*.test.ts\"",
     "typecheck": "tsc"
