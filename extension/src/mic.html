@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Debrief: microphone</title>
+    <script src="theme-init.js"></script>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <!-- Chrome can't ask for the microphone from the side panel, so Debrief asks here, once. -->
+  <body class="mic-page">
+    <main class="card stack">
+      <h1>Let Debrief hear your microphone</h1>
+      <p>So the transcript can label lines <b>You</b> and <b>Them</b>, and fill in the question you asked. Your voice goes straight to the speech service with the call, and isn’t stored.</p>
+      <p id="micAsk">Choose <b>Allow</b> in the box Chrome shows.</p>
+      <p class="warn" id="micBlocked" hidden>Chrome has blocked the microphone for Debrief. Click the icon at the left of the address bar, set <b>Microphone</b> to <b>Allow</b>, then press Try again.</p>
+      <p class="ok" id="micDone" hidden>Done. Go back to your call: your microphone is included from the next time you start listening. This tab closes by itself.</p>
+      <div class="row">
+        <button class="primary-btn" id="micTry" type="button">Allow microphone</button>
+      </div>
+    </main>
+    <script type="module" src="mic.js"></script>
+  </body>
+</html>

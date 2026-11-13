@@ -1,10 +1,10 @@
 // Interview section of a candidate's page: the interview itself. Checklist and notes, the live transcript,
 // follow-up suggestions and the questions from the plan.
 import { $, el, toast, confirmSheet, fillSelect, withBusy, errorMessage } from './ui.ts';
-import { getState, getSettings, commit, commitSoon, savePendingNow, subscribe } from './data.ts';
+import { getState, getSettings, saveSettings, commit, commitSoon, savePendingNow, subscribe } from './data.ts';
 import { api } from './api.ts';
 import { startListening, type Listening } from './capture.ts';
-import { emptyTranscript, recentText, transcriptText } from './transcript.ts';
+import { emptyTranscript, recentText, transcriptText, lastQuestion, SPEAKER_LABELS } from './transcript.ts';
 import { leftCallSite, LISTENING_BADGE } from './call-tab.ts';
 import * as S from './store.ts';
 
@@ -14,6 +14,7 @@ let listening: Listening | null = null; // set while the call is being transcrib
 let transcript = emptyTranscript(); // kept in this panel only, never saved
 let onEnd: (candidateId: string) => void = () => {};
 let callTab: { id: number; url: string } | null = null; // the tab being listened to
+let autoQuestion = ''; // the last question filled in from the transcript, so a typed one isn't replaced
 
 const input = (id: string) => $<HTMLInputElement>(id);
 const textarea = (id: string) => $<HTMLTextAreaElement>(id);
@@ -43,6 +44,24 @@ export function initInterview(options: { onEnd: (candidateId: string) => void; o
     stopListening();
     toast('Stopped listening: the call tab went to another site.', { error: true });
   });
+  // Include my microphone: asks for it in a tab the first time (the side panel can't), and applies at once
+  // if listening (restarting it, so unticking stops the microphone straight away).
+  const micBox = input('liveMic');
+  micBox.checked = getSettings().includeMic;
+  micBox.addEventListener('change', async () => {
+    const on = micBox.checked;
+    if (!(await saveSettings({ includeMic: on }))) return;
+    if (on && (await micPermission()) !== 'granted') {
+      await chrome.tabs.create({ url: chrome.runtime.getURL('mic.html') });
+      toast('Allow the microphone in the tab we opened, then come back here.');
+      return;
+    }
+    if (listening) {
+      stopListening();
+      await start();
+    }
+  });
+
   // A badge left from a panel that closed while listening (closing the panel ends the audio).
   showBadge(false);
   window.addEventListener('pagehide', () => showBadge(false));
@@ -115,6 +134,7 @@ export function renderInterviewSection(id: string): void {
     $('liveSuggestions').replaceChildren();
     textarea('liveAnswer').value = '';
     input('liveQuestion').value = '';
+    autoQuestion = '';
   }
   render();
 }
@@ -219,9 +239,20 @@ function showBadge(on: boolean) {
   chrome.action.setTitle({ title: on ? 'Debrief: listening to the call' : 'Open Debrief' }).catch(() => {});
 }
 
+// The extension's microphone permission: 'granted', 'prompt' or 'denied' ('prompt' if Chrome can't say).
+async function micPermission(): Promise<PermissionState> {
+  try {
+    return (await navigator.permissions.query({ name: 'microphone' as PermissionName })).state;
+  } catch {
+    return 'prompt';
+  }
+}
+
 function renderTranscript() {
   const box = $('liveTranscript');
-  const nodes = transcript.lines.map((l) => el('p', {}, l.text));
+  const nodes = transcript.lines.map((l) =>
+    l.speaker ? el('p', { class: `line ${l.speaker}` }, el('span', { class: 'who' }, SPEAKER_LABELS[l.speaker]), l.text) : el('p', {}, l.text),
+  );
   if (transcript.interim) nodes.push(el('p', { class: 'interim' }, transcript.interim));
   if (!nodes.length) nodes.push(el('p', { class: 'placeholder' }, 'The transcript shows up here while you listen.'));
   const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
@@ -233,19 +264,32 @@ async function start() {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   if (!tab?.id || !/^https:/.test(tab.url || '')) return toast('Open the call in a browser tab first (Google Meet, Zoom or Teams on the web).', { error: true });
   toast('Starting…');
+  const withMic = getSettings().includeMic;
+  let micNote = ''; // why the microphone couldn't be included this time
   try {
     listeningFor = candidateId;
     listening = await startListening({
       tabId: tab.id,
       language: getSettings().language,
       transcript, // keep what was said before a stop
+      withMic,
+      onMicProblem: (reason) => {
+        micNote =
+          reason === 'blocked'
+            ? 'Debrief can’t use your microphone yet: untick and tick “Include my microphone” to allow it.'
+            : 'No microphone found.';
+      },
       getKey: () => api('/api/transcribe-token'),
       onTranscript: (t) => {
         transcript = t;
         renderTranscript();
+        fillQuestion();
       },
       onStatus: (text, isError) => {
-        if (text !== 'Stopped.') toast(text === 'Listening' ? 'Listening to the call.' : text, { error: isError });
+        if (text === 'Listening') {
+          if (micNote) toast(`Listening to the call only. ${micNote}`, { error: true });
+          else toast(withMic ? 'Listening to the call and your microphone.' : 'Listening to the call.');
+        } else if (text !== 'Stopped.') toast(text, { error: isError });
         if (isError) {
           listening = null;
           listeningFor = '';
@@ -267,6 +311,15 @@ async function start() {
     toast(errorMessage(err, 'We couldn’t start listening. Please try again.'), { error: true });
   }
   updateListenButtons();
+}
+
+// With You and Them labels: put your latest line in "Question you asked", unless you typed your own there.
+function fillQuestion() {
+  const asked = lastQuestion(transcript);
+  if (!asked || asked === autoQuestion) return;
+  const field = input('liveQuestion');
+  if (!field.value.trim() || field.value === autoQuestion) field.value = asked;
+  autoQuestion = asked;
 }
 
 function stopListening() {
@@ -320,6 +373,7 @@ async function endInterview() {
   $('liveSuggestions').replaceChildren();
   textarea('liveAnswer').value = '';
   input('liveQuestion').value = '';
+  autoQuestion = '';
   updateListenButtons();
   if (saved) toast('Interview ended. Your notes are under Notes.');
 }

@@ -1,15 +1,21 @@
-// Browser side of live transcription: the call tab's audio goes straight from this browser to Deepgram.
-// Runs in the side panel. The panel must stay open during the call.
-import { listenUrl, applyMessage, emptyTranscript, type DeepgramMessage, type Transcript } from './transcript.ts';
+// Browser side of live transcription: the call tab's audio, and the interviewer's microphone if they
+// include it, goes straight from this browser to Deepgram. Runs in the side panel; it must stay open.
+import { listenUrl, applyMessage, emptyTranscript, speakerFor, type DeepgramMessage, type LevelSample, type Transcript } from './transcript.ts';
 
 const KEEP_ALIVE_MS = 8000;
 const CHUNK_MS = 250;
+const LEVEL_MS = 100; // how often the microphone and call levels are sampled, for You and Them labels
+const LEVELS_KEPT_S = 120; // lines are labelled within seconds of being spoken; older samples are dropped
 
 export interface ListenOptions {
   tabId: number;
   language?: string;
   // The transcript so far, when listening restarts during an interview. New lines are added to it.
   transcript?: Transcript;
+  // Mix in the microphone and label lines You and Them. Needs the extension's microphone permission
+  // (see mic.html); without it, listening goes on with the call only and onMicProblem says why.
+  withMic?: boolean;
+  onMicProblem?: (reason: 'blocked' | 'unavailable') => void;
   getKey: () => Promise<{ key: string }>;
   onTranscript: (transcript: Transcript) => void;
   onStatus: (text: string, isError: boolean) => void;
@@ -27,7 +33,7 @@ interface TabAudioConstraints {
 
 // Starts listening to one tab. Calls onTranscript(transcript) as lines arrive and onStatus(text, isError).
 // Returns { stop() }. Throws a user-facing Error if it can't start.
-export async function startListening({ tabId, language = 'en', transcript: initial, getKey, onTranscript, onStatus }: ListenOptions): Promise<Listening> {
+export async function startListening({ tabId, language = 'en', transcript: initial, withMic = false, onMicProblem, getKey, onTranscript, onStatus }: ListenOptions): Promise<Listening> {
   // 1. Get the tab's audio. The tab goes quiet for the user, so we also play it back below.
   // Chrome only allows this after the Debrief icon was clicked on that tab (it grants access to the tab).
   let streamId: string;
@@ -43,8 +49,46 @@ export async function startListening({ tabId, language = 'en', transcript: initi
   };
   const tabStream = await navigator.mediaDevices.getUserMedia(constraints as MediaStreamConstraints);
 
+  // The interviewer's microphone, with echo cancellation so the call coming out of the speakers isn't
+  // picked up as them speaking. Never played back (you'd hear yourself).
+  let micStream: MediaStream | null = null;
+  if (withMic) {
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    } catch (err) {
+      const name = (err as Error)?.name;
+      onMicProblem?.(name === 'NotAllowedError' || name === 'SecurityError' ? 'blocked' : 'unavailable');
+    }
+  }
+
   const ctx = new AudioContext();
-  ctx.createMediaStreamSource(tabStream).connect(ctx.destination);
+  const tabSource = ctx.createMediaStreamSource(tabStream);
+  tabSource.connect(ctx.destination);
+  // With the microphone, Deepgram gets one stream with both mixed: one stream costs the same as the call alone.
+  let sendStream = tabStream;
+  let levelOf: (() => { mic: number; tab: number }) | null = null;
+  if (micStream) {
+    const mix = ctx.createMediaStreamDestination();
+    const micSource = ctx.createMediaStreamSource(micStream);
+    tabSource.connect(mix);
+    micSource.connect(mix);
+    sendStream = mix.stream;
+    const meter = (source: MediaStreamAudioSourceNode) => {
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 2048;
+      source.connect(analyser);
+      const buf = new Float32Array(analyser.fftSize);
+      return () => {
+        analyser.getFloatTimeDomainData(buf);
+        let sum = 0;
+        for (const v of buf) sum += v * v;
+        return Math.sqrt(sum / buf.length);
+      };
+    };
+    const mic = meter(micSource);
+    const tab = meter(tabSource);
+    levelOf = () => ({ mic: mic(), tab: tab() });
+  }
 
   // 2. Get a short-lived key just before connecting, because it expires quickly.
   let key: string;
@@ -52,6 +96,7 @@ export async function startListening({ tabId, language = 'en', transcript: initi
     ({ key } = await getKey());
   } catch (err) {
     tabStream.getTracks().forEach((t) => t.stop());
+    micStream?.getTracks().forEach((t) => t.stop());
     await ctx.close();
     throw new Error((err instanceof Error && err.message) || 'We couldn’t start listening. Please try again.');
   }
@@ -65,6 +110,10 @@ export async function startListening({ tabId, language = 'en', transcript: initi
   let transcript = initial ? { lines: initial.lines, interim: '' } : emptyTranscript();
   let recorder: MediaRecorder | null = null;
   let keepAlive: ReturnType<typeof setInterval> | null = null;
+  let sampler: ReturnType<typeof setInterval> | null = null;
+  const levels: LevelSample[] = [];
+  // Deepgram times lines from the first audio it gets, which is when the recorder starts.
+  const whoSpoke = levelOf ? (start: number, end: number) => speakerFor(levels, start, end) : undefined;
   let stopped = false;
 
   // Chunks are pieces of one audio file: send them in order, or words are lost.
@@ -73,8 +122,10 @@ export async function startListening({ tabId, language = 'en', transcript: initi
 
   function cleanup() {
     if (keepAlive) clearInterval(keepAlive);
+    if (sampler) clearInterval(sampler);
     if (recorder && recorder.state !== 'inactive') recorder.stop();
     tabStream.getTracks().forEach((t) => t.stop());
+    micStream?.getTracks().forEach((t) => t.stop());
     ctx.close().catch(() => {});
   }
 
@@ -91,7 +142,7 @@ export async function startListening({ tabId, language = 'en', transcript: initi
   );
 
   ws.onopen = () => {
-    recorder = new MediaRecorder(tabStream, { mimeType: mime, audioBitsPerSecond: 64000 });
+    recorder = new MediaRecorder(sendStream, { mimeType: mime, audioBitsPerSecond: 64000 });
     recorder.ondataavailable = (e) => {
       if (!e.data.size) return;
       const read = e.data.arrayBuffer();
@@ -103,6 +154,15 @@ export async function startListening({ tabId, language = 'en', transcript: initi
         .catch(() => {});
     };
     recorder.start(CHUNK_MS);
+    if (levelOf) {
+      const sample = levelOf;
+      const t0 = performance.now();
+      sampler = setInterval(() => {
+        const t = (performance.now() - t0) / 1000;
+        levels.push({ t, ...sample() });
+        while (levels.length && levels[0].t < t - LEVELS_KEPT_S) levels.shift();
+      }, LEVEL_MS);
+    }
     keepAlive = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'KeepAlive' }));
     }, KEEP_ALIVE_MS);
@@ -116,7 +176,7 @@ export async function startListening({ tabId, language = 'en', transcript: initi
     } catch {
       return;
     }
-    const next = applyMessage(transcript, msg);
+    const next = applyMessage(transcript, msg, whoSpoke);
     if (next !== transcript) {
       transcript = next;
       onTranscript(transcript);
