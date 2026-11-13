@@ -2,8 +2,8 @@
 // - 'current': the Interview tab. Shows the current candidate (running interview, your choice, or next due).
 // - 'browse': opened from Upcoming or Jobs to look at someone else, with Back. Their Interview part offers
 //   "Interview … now" instead of the interview itself, so looking around never stops a running transcription.
-import { $, el, formatDate, closestTarget, type Nav, type Section, type Tab } from './ui.ts';
-import { getState, subscribe } from './data.ts';
+import { $, el, formatDate, closestTarget, toast, confirmSheet, type Nav, type Section, type Tab } from './ui.ts';
+import { getState, subscribe, commit } from './data.ts';
 import { renderPlanSection } from './plan-view.ts';
 import { renderInterviewSection, copy } from './interview-view.ts';
 import * as S from './store.ts';
@@ -21,6 +21,8 @@ let candidateId = '';
 let section: Section = 'interview';
 let backTo: Tab = 'upcoming';
 let visible = false;
+// The finished interview whose notes are being edited, with what's typed so far (kept across re-renders).
+let editing: { id: string; draft: S.NotesEdit } | null = null;
 
 export const shownCandidate = (): string => candidateId;
 export const shownSection = (): Section => section;
@@ -180,7 +182,12 @@ function renderNotes(cand: S.Candidate) {
   if (!past.length) {
     parts.push(el('p', { class: 'muted' }, 'No finished interviews yet. When you end an interview, your notes are kept here.'));
   }
+  if (editing && !past.some((iv) => iv.id === editing?.id)) editing = null; // deleted meanwhile
   for (const iv of past) {
+    if (editing?.id === iv.id) {
+      parts.push(notesEditor(iv, editing.draft));
+      continue;
+    }
     const { covered, total } = S.coverage(iv);
     const written = iv.skills.filter((s) => s.notes.trim());
     parts.push(
@@ -204,10 +211,82 @@ function renderNotes(cand: S.Candidate) {
         el(
           'div',
           { class: 'row end' },
+          el('button', { class: 'link-btn danger small', type: 'button', onclick: () => removeInterview(iv) }, 'Delete'),
+          el('span', { class: 'spacer' }),
+          el('button', { class: 'soft-btn small', type: 'button', onclick: () => startEditing(iv) }, 'Edit'),
           el('button', { class: 'soft-btn small', type: 'button', onclick: () => copy(S.interviewMarkdown(getState(), iv.id), 'Notes copied.') }, 'Copy notes'),
         ),
       ),
     );
   }
   $('section-notes').replaceChildren(...parts);
+}
+
+// ---------- Editing and deleting a finished interview ----------
+
+function startEditing(iv: S.Interview) {
+  editing = { id: iv.id, draft: { skills: iv.skills.map((sk) => ({ covered: sk.covered, notes: sk.notes })), generalNotes: iv.generalNotes } };
+  const cand = S.getCandidate(getState(), iv.candidateId);
+  if (cand) renderNotes(cand);
+  $('section-notes').querySelector<HTMLTextAreaElement>('textarea')?.focus();
+}
+
+// The same fields as during the interview: a tick and notes per skill, then Other notes.
+function notesEditor(iv: S.Interview, draft: S.NotesEdit): HTMLElement {
+  const date = formatDate(new Date(iv.startedAt).toISOString());
+  const area = (label: string, value: string, oninput: (v: string) => void) =>
+    el('textarea', { rows: '3', 'aria-label': label, oninput: (e: Event) => oninput((e.target as HTMLTextAreaElement).value) }, value);
+  return el(
+    'section',
+    { class: 'card editing' },
+    el('div', { class: 'section-head' }, el('h3', {}, `Edit notes: ${date}`)),
+    el(
+      'ul',
+      { class: 'checklist' },
+      ...iv.skills.map((sk, i) =>
+        el(
+          'li',
+          {},
+          el(
+            'label',
+            { class: 'check' },
+            el('input', { type: 'checkbox', checked: draft.skills[i]?.covered || false, onchange: (e: Event) => (draft.skills[i].covered = (e.target as HTMLInputElement).checked) }),
+            el('span', {}, sk.name),
+          ),
+          area(`Notes for ${sk.name}`, draft.skills[i]?.notes || '', (v) => (draft.skills[i].notes = v)),
+        ),
+      ),
+      el('li', {}, el('b', {}, 'Other notes'), area('Other notes', draft.generalNotes, (v) => (draft.generalNotes = v))),
+    ),
+    el(
+      'div',
+      { class: 'row end' },
+      el('button', { class: 'soft-btn small', type: 'button', onclick: () => stopEditing() }, 'Cancel'),
+      el('button', { class: 'primary-btn small', type: 'button', onclick: () => saveEdit(iv.id, draft) }, 'Save notes'),
+    ),
+  );
+}
+
+function stopEditing() {
+  editing = null;
+  const cand = S.getCandidate(getState(), candidateId);
+  if (cand) renderNotes(cand);
+}
+
+async function saveEdit(interviewId: string, draft: S.NotesEdit) {
+  if (!(await commit(S.editInterviewNotes(getState(), interviewId, draft)))) return; // error shown; keep editing
+  editing = null;
+  stopEditing();
+  toast('Notes saved.');
+}
+
+async function removeInterview(iv: S.Interview) {
+  const name = S.getCandidate(getState(), iv.candidateId)?.name || 'this candidate';
+  const ok = await confirmSheet({
+    title: 'Delete this interview?',
+    body: `This deletes the interview with ${name} on ${formatDate(new Date(iv.startedAt).toISOString())} and all its notes. This can’t be undone.`,
+    yes: 'Delete interview',
+  });
+  if (!ok) return;
+  if (await commit(S.deleteInterview(getState(), iv.id))) toast('Interview deleted.');
 }
