@@ -61,16 +61,49 @@ export function icon(name: string): SVGSVGElement {
   return svg;
 }
 
-// A short message at the bottom of the panel. Errors stay until the next message; others fade.
+// How long a message stays up, in ms. Errors stay long enough to read (about 70 ms a character,
+// between 10 and 20 seconds); others fade after 3.5 seconds.
+export function toastDuration(message: string, error: boolean): number {
+  if (!error) return 3500;
+  return Math.min(20_000, Math.max(10_000, message.length * 70));
+}
+
+// A short message at the bottom of the panel. Errors have a close button and hide on their own
+// (later than other messages); the next message replaces either. While the pointer is over a message,
+// or its close button has focus, it stays up.
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
+let toastWait = 0;
+
+const hideToastLater = () => {
+  clearTimeout(toastTimer);
+  if (toastWait) toastTimer = setTimeout(hideToast, toastWait);
+};
+
+export function hideToast(): void {
+  clearTimeout(toastTimer);
+  toastWait = 0;
+  const box = $('toast');
+  if (box) box.hidden = true;
+}
+
 export function toast(message: string, { error = false }: { error?: boolean } = {}): void {
   const box = $('toast');
   if (!box) return;
-  clearTimeout(toastTimer);
-  box.textContent = message || '';
+  if (!box.dataset.wired) {
+    box.dataset.wired = '1';
+    $('toastClose').addEventListener('click', hideToast);
+    box.addEventListener('pointerenter', () => clearTimeout(toastTimer));
+    box.addEventListener('pointerleave', hideToastLater);
+    box.addEventListener('focusin', () => clearTimeout(toastTimer));
+    box.addEventListener('focusout', hideToastLater);
+  }
+  if (!message) return hideToast();
+  $('toastText').textContent = message;
   box.classList.toggle('error', error);
-  box.hidden = !message;
-  if (message && !error) toastTimer = setTimeout(() => (box.hidden = true), 3500);
+  $('toastClose').hidden = !error;
+  box.hidden = false;
+  toastWait = toastDuration(message, error);
+  hideToastLater();
 }
 
 // Opens a <dialog> sheet. Any [data-close] button inside closes it.
