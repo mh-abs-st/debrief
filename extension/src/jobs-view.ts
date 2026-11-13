@@ -379,7 +379,6 @@ function wireCandidateSheet() {
     };
     if (!fields.name.trim()) return toast('Add the candidate’s name.', { error: true });
     if (fields.profileUrl.trim() && !S.cleanUrl(fields.profileUrl)) return toast('That profile link doesn’t look right. Use a web address.', { error: true });
-    if (fields.interviewAt && !editingCandidate.id) fields.stage = 'scheduled';
     try {
       if (editingCandidate.id) {
         if (!(await commit(S.updateCandidate(getState(), editingCandidate.id, fields)))) return; // sheet stays open
