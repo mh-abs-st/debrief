@@ -5,6 +5,7 @@ import { getState, getSettings, commit, commitSoon, savePendingNow, subscribe } 
 import { api } from './api.ts';
 import { startListening, type Listening } from './capture.ts';
 import { emptyTranscript, recentText, transcriptText } from './transcript.ts';
+import { leftCallSite, LISTENING_BADGE } from './call-tab.ts';
 import * as S from './store.ts';
 
 let candidateId = ''; // the candidate this section shows
@@ -12,6 +13,7 @@ let listeningFor = ''; // the candidate whose call is being transcribed
 let listening: Listening | null = null; // set while the call is being transcribed
 let transcript = emptyTranscript(); // kept in this panel only, never saved
 let onEnd: (candidateId: string) => void = () => {};
+let callTab: { id: number; url: string } | null = null; // the tab being listened to
 
 const input = (id: string) => $<HTMLInputElement>(id);
 const textarea = (id: string) => $<HTMLTextAreaElement>(id);
@@ -19,8 +21,31 @@ const button = (id: string) => $<HTMLButtonElement>(id);
 
 // onEnd runs just before an ended interview is saved, so the page can keep this candidate and show Notes
 // (saving redraws everything, and the Interview tab would otherwise move on to the next candidate).
-export function initInterview(options: { onEnd: (candidateId: string) => void }): void {
+// openCandidate(id) shows that candidate's Interview part: the listening band uses it from any page.
+export function initInterview(options: { onEnd: (candidateId: string) => void; openCandidate: (candidateId: string) => void }): void {
   onEnd = options.onEnd;
+  $('liveBandOpen').addEventListener('click', () => {
+    if (listeningFor) options.openCandidate(listeningFor);
+  });
+  $('liveBandStop').addEventListener('click', () => {
+    stopListening();
+    toast('Stopped listening.');
+  });
+  // Stop when the call tab closes or goes to another site, and say so.
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    if (!listening || tabId !== callTab?.id) return;
+    stopListening();
+    toast('Stopped listening: the call tab was closed.', { error: true });
+  });
+  chrome.tabs.onUpdated.addListener((tabId, change) => {
+    const call = callTab;
+    if (!listening || !call || tabId !== call.id || !change.url || !leftCallSite(call.url, change.url)) return;
+    stopListening();
+    toast('Stopped listening: the call tab went to another site.', { error: true });
+  });
+  // A badge left from a panel that closed while listening (closing the panel ends the audio).
+  showBadge(false);
+  window.addEventListener('pagehide', () => showBadge(false));
   $('liveStart').addEventListener('click', async () => {
     const { state } = S.startInterview(getState(), candidateId);
     transcript = emptyTranscript();
@@ -173,12 +198,25 @@ function renderPlan(cand: S.Candidate) {
 
 // ---------- Listening ----------
 
+// Every change to listening ends here: the buttons, the band on every page and the toolbar badge.
 function updateListenButtons() {
   const on = Boolean(listening);
+  if (!on) callTab = null;
   button('liveListen').hidden = on;
   button('liveStop').hidden = !on;
   $('liveDot').classList.toggle('on', on);
   $('liveState').textContent = on ? 'Listening' : 'Not listening';
+  const name = on ? S.getCandidate(getState(), listeningFor)?.name : '';
+  $('liveBandName').textContent = name ? `: ${name}` : '';
+  $('liveBand').hidden = !on;
+  showBadge(on);
+}
+
+// The red "LIVE" on the Debrief icon, so it shows even with the panel scrolled or another tab in front.
+function showBadge(on: boolean) {
+  chrome.action.setBadgeText({ text: on ? LISTENING_BADGE : '' }).catch(() => {});
+  if (on) chrome.action.setBadgeBackgroundColor({ color: '#d6334a' }).catch(() => {});
+  chrome.action.setTitle({ title: on ? 'Debrief: listening to the call' : 'Open Debrief' }).catch(() => {});
 }
 
 function renderTranscript() {
@@ -215,6 +253,7 @@ async function start() {
         }
       },
     });
+    callTab = { id: tab.id, url: tab.url || '' };
     // Deleted while listening was starting up.
     if (!exists(getState(), listeningFor)) {
       stopListening();
