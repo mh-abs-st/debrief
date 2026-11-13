@@ -14,7 +14,7 @@ export interface Settings {
 }
 
 export const SETTINGS_DEFAULTS: Settings = {
-  serverUrl: 'http://localhost:8789', // same port as the server's default and manifest.json's host_permissions
+  serverUrl: 'http://localhost:8789', // the development server; npm run package swaps in the production one
   appToken: '',
   language: 'en',
   theme: 'system',

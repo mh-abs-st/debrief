@@ -70,6 +70,8 @@ Everything is TypeScript. The server and the tests run the `.ts` files directly 
 
    Open `chrome://extensions`, turn on Developer mode, choose "Load unpacked", and select the `extension/dist/` folder. After each rebuild, press the reload icon on the Debrief card. Open Settings in the side panel and paste the same `DEBRIEF_APP_TOKEN`.
 
+4. Chrome Web Store package: `npm run package -- https://<production server>` (in `extension/`) builds and writes `extension/release/debrief-<version>.zip`, with the production server in place of `localhost`. Listing text, permission justifications and images: `docs/store-listing.md` and `docs/store/`.
+
 ## API
 
 All `/api` routes need `Authorization: Bearer <DEBRIEF_APP_TOKEN>`. Without a configured token, the API refuses everything. CORS allows only `chrome-extension://` origins.
