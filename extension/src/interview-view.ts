@@ -6,6 +6,7 @@ import { api } from './api.ts';
 import { startListening, NeedsOkError, type Listening } from './capture.ts';
 import { emptyTranscript, recentText, transcriptText, lastQuestion, SPEAKER_LABELS } from './transcript.ts';
 import { leftCallSite, needsOkMessage, LISTENING_BADGE } from './call-tab.ts';
+import { candidateNotice } from './notice.ts';
 import * as S from './store.ts';
 
 let candidateId = ''; // the candidate this section shows
@@ -44,6 +45,12 @@ export function initInterview(options: { onEnd: (candidateId: string) => void; o
     stopListening();
     toast('Stopped listening: the call tab went to another site.', { error: true });
   });
+  // What to tell the candidate (notice.ts; company and contact come from Settings).
+  $('liveCopyNotice').addEventListener('click', () => {
+    const { written } = currentNotice();
+    copy(written, getSettings().privacyContact ? 'Notice copied. Paste it into the invite.' : 'Notice copied. Tip: add who candidates can ask about their data in Settings.');
+  });
+
   // Include my microphone: asks for it in a tab the first time (the side panel can't), and applies at once
   // if listening (restarting it, so unticking stops the microphone straight away).
   const micBox = input('liveMic');
@@ -155,6 +162,7 @@ function render() {
 
   const iv = S.openInterview(state, cand.id);
   $('liveStartBox').hidden = Boolean(iv);
+  $('liveSay').textContent = currentNotice().spoken;
   $('liveRun').hidden = !iv;
   $('liveNoSkills').hidden = Boolean(job.skills.length);
 
@@ -237,6 +245,11 @@ function showBadge(on: boolean) {
   chrome.action.setBadgeText({ text: on ? LISTENING_BADGE : '' }).catch(() => {});
   if (on) chrome.action.setBadgeBackgroundColor({ color: '#d6334a' }).catch(() => {});
   chrome.action.setTitle({ title: on ? 'Debrief: listening to the call' : 'Open Debrief' }).catch(() => {});
+}
+
+function currentNotice() {
+  const s = getSettings();
+  return candidateNotice({ company: s.companyName, contact: s.privacyContact, retentionDays: s.retentionDays });
 }
 
 // The extension's microphone permission: 'granted', 'prompt' or 'denied' ('prompt' if Chrome can't say).

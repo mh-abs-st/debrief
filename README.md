@@ -16,7 +16,7 @@ The interview comes first. Everything is about one candidate at a time, and each
   - **Interview:** open Debrief on the call tab (its toolbar icon, or Alt+Shift+D; change it at `chrome://extensions/shortcuts`), then start the interview and listening starts with it; stop and restart listening whenever you need. While listening, a red band on every page (and LIVE on the toolbar icon) says so; listening stops by itself if the call tab closes or goes to another site. Tick skills as you cover them, write notes per skill, get follow-up questions from the transcript or a typed answer.
   - **Notes:** every finished interview with what you wrote, to read or copy as Markdown.
 - **Demo:** a short scripted interview with made-up people. No call, AI, account, or saved data. Opens from the empty Interview tab or from Settings.
-- **Settings** (gear icon): server address and app token, call language, theme, how long candidate data is kept, and deleting everything.
+- **Settings** (gear icon): server address and app token, call language, theme, the candidate notice (company name, who candidates can ask about their data, and the notice to copy into invites), how long candidate data is kept, backup and restore, and deleting everything.
 
 The panel reopens where you left it, so closing it mid-interview brings you back to that interview.
 
@@ -24,7 +24,7 @@ The panel reopens where you left it, so closing it mid-interview brings you back
 
 - The tool supports the interviewer. It does not score, rank, or recommend candidates.
 - No emotion, tone or personality analysis.
-- Listening starts with the interview, and the interviewer tells the candidate the call is transcribed (a reminder sits under Start interview). It is always visible while on: a red band on every page and LIVE on the toolbar icon.
+- Listening starts with the interview, and the interviewer tells the candidate the call is transcribed: under Start interview there's a sentence to say, and a written notice to copy into the invite (`extension/src/notice.ts`). It is always visible while on: a red band on every page and LIVE on the toolbar icon.
 - Call audio goes from the browser to the speech service and is never stored. The transcript is cleared when the interview ends.
 - Jobs, candidates, resumes, plans and notes are saved only on the interviewer's computer, and deleted automatically after the retention period in Settings (90 days by default).
 - Profile links are only stored so you can open them. Debrief never reads or scrapes the page.

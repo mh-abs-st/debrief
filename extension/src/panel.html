@@ -114,7 +114,11 @@
           <div class="stack" id="liveArea">
           <section class="card" id="liveStartBox">
             <p>Start when the call begins. Debrief starts listening to the call tab right away, and you get the job’s checklist and a notes box for each skill. You can stop and restart listening at any time.</p>
-            <p class="help">Let the candidate know the call is transcribed for your notes.</p>
+            <div class="notice-say">
+              <p class="help">Tell the candidate the call is transcribed. You could say:</p>
+              <p class="say" id="liveSay"></p>
+              <button class="link-btn" id="liveCopyNotice" type="button">Copy the written notice, for the invite</button>
+            </div>
             <p class="warn" id="liveNoSkills" hidden>This job has no skills checklist yet. You can still take notes, or add skills in Jobs first.</p>
             <button class="primary-btn" id="liveStart" type="button">Start interview</button>
           </section>
@@ -315,6 +319,17 @@
           </label>
           <p class="help">Deleting a candidate removes their resume, plan and notes. Check how long your company may keep candidate data.</p>
           <button class="link-btn danger" id="setDeleteAll" type="button">Delete all jobs, candidates and notes</button>
+        </fieldset>
+        <fieldset>
+          <legend>Candidate notice</legend>
+          <p class="help">A short note for candidates on how their interview is transcribed and what’s kept. Add it to the invite; there’s a sentence to say under Start interview too. Have whoever handles privacy at your company check the wording.</p>
+          <label>Company name<input id="setCompany" type="text" autocomplete="organization" placeholder="Northwind" /></label>
+          <label>Who candidates can ask about their data<input id="setContact" type="text" autocomplete="email" placeholder="privacy@yourcompany.com" /></label>
+          <details class="guide">
+            <summary>Read the notice</summary>
+            <p class="notice-text" id="setNoticePreview"></p>
+          </details>
+          <button class="soft-btn" id="setCopyNotice" type="button">Copy the notice</button>
         </fieldset>
         <fieldset>
           <legend>Backup</legend>
