@@ -61,6 +61,9 @@ jobs:
       - run: npm test
       - run: npm run typecheck
       - run: npm run build
+      # The Chrome Web Store package, with a placeholder server, checked with unzip.
+      - if: matrix.node == 22
+        run: npm run package -- https://api.example.com && unzip -tq release/debrief-*.zip
       # dist/ ready to load unpacked in chrome://extensions (one copy is enough).
       - if: matrix.node == 22
         uses: actions/upload-artifact@v6
