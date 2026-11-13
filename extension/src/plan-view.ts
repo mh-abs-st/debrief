@@ -37,6 +37,8 @@ export function renderPlanSection(id: string): void {
       ? el('button', { class: 'link-btn inline', type: 'button', onclick: () => nav.job(job.id) }, 'Open the job')
       : el('button', { class: 'link-btn inline', type: 'button', onclick: () => nav.editCandidate(cand.id) }, 'Add the resume'),
   );
+  // The job's skills changed after this plan was made. Keep the old plan; making it again uses the new skills.
+  $('prepStale').hidden = missing.length > 0 || !S.planOutOfDate(job, cand);
   const make = $<HTMLButtonElement>('prepMake');
   make.disabled = missing.length > 0;
   make.textContent = cand.plan ? 'Make the plan again' : 'Make interview plan';
@@ -102,7 +104,7 @@ async function makePlan(button: HTMLButtonElement) {
         skills: job.skills,
         resumeText: cand.resumeText,
       });
-      if (!(await commit(S.updateCandidate(getState(), cand.id, { plan })))) return;
+      if (!(await commit(S.updateCandidate(getState(), cand.id, { plan: S.planForJob(plan, job) })))) return;
       toast('Plan ready. You’ll also see it in Interview.');
     } catch (err) {
       toast(errorMessage(err), { error: true });

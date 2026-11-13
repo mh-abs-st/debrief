@@ -133,6 +133,50 @@ test('a date schedules a New candidate, when adding or editing', () => {
   assert.equal(S.getCandidate(state, fay.candidate.id)?.stage, 'new');
 });
 
+test('a plan is marked out of date when the job\'s skills change, and kept', () => {
+  let { state, job, ana } = seed();
+  const fromServer: S.Plan = {
+    opening: 'Tell me about your last API.',
+    skills: [{ name: 'Node.js', resumeShows: '5 years', askAbout: '', questions: [] }, { name: 'SQL', resumeShows: '', askAbout: '', questions: [] }],
+    verify: [],
+  };
+  const plan = S.planForJob(fromServer, job);
+  assert.deepEqual(plan.madeFromSkills, ['Node.js', 'SQL']);
+  state = S.updateCandidate(state, ana.id, { plan });
+  const cand = () => S.getCandidate(state, ana.id)!;
+  const theJob = () => S.getJob(state, job.id)!;
+  assert.equal(S.planOutOfDate(theJob(), cand()), false);
+
+  // Reordering or changing capitals or the reason isn't a change.
+  state = S.updateJob(state, job.id, { skills: [{ name: 'sql', why: 'reports' }, { name: 'Node.js' }] });
+  assert.equal(S.planOutOfDate(theJob(), cand()), false);
+
+  // Adding, removing or renaming a skill is. The old plan stays.
+  state = S.updateJob(state, job.id, { skills: [{ name: 'Node.js' }, { name: 'SQL' }, { name: 'AWS' }] });
+  assert.equal(S.planOutOfDate(theJob(), cand()), true);
+  assert.equal(cand().plan?.opening, 'Tell me about your last API.');
+  state = S.updateJob(state, job.id, { skills: [{ name: 'Node.js' }] });
+  assert.equal(S.planOutOfDate(theJob(), cand()), true);
+  state = S.updateJob(state, job.id, { skills: [{ name: 'Node.js' }, { name: 'PostgreSQL' }] });
+  assert.equal(S.planOutOfDate(theJob(), cand()), true);
+
+  // Making the plan again from the new skills clears it.
+  state = S.updateCandidate(state, ana.id, { plan: S.planForJob({ ...fromServer, skills: [] }, theJob()) });
+  assert.equal(S.planOutOfDate(theJob(), cand()), false);
+
+  // No plan: nothing to be out of date.
+  assert.equal(S.planOutOfDate(theJob(), { ...cand(), plan: null }), false);
+});
+
+test('plans saved before madeFromSkills use the skills the plan lists', () => {
+  let { state, job, ana } = seed();
+  const old: S.Plan = { opening: '', skills: [{ name: 'Node.js', resumeShows: '', askAbout: '', questions: [] }, { name: 'SQL', resumeShows: '', askAbout: '', questions: [] }], verify: [] };
+  state = S.updateCandidate(state, ana.id, { plan: old });
+  assert.equal(S.planOutOfDate(job, S.getCandidate(state, ana.id)!), false);
+  state = S.updateJob(state, job.id, { skills: [{ name: 'Node.js' }, { name: 'Go' }] });
+  assert.equal(S.planOutOfDate(S.getJob(state, job.id)!, S.getCandidate(state, ana.id)!), true);
+});
+
 test('upcoming groups candidates by interview day, running interviews first', () => {
   let { state, job } = seed();
   const add = (name: string, interviewAt: string, stage?: string) => {
