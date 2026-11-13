@@ -1,6 +1,7 @@
 // Settings sheet: server connection, transcription language, theme, how long candidate data is kept,
 // backing up and restoring, and deleting everything.
-import { $, el, toast, openSheet, confirmSheet, closestTarget, formatDate, type Nav } from './ui.ts';
+import { $, el, toast, openSheet, confirmSheet, closestTarget, formatDate, actionShortcut, type Nav } from './ui.ts';
+import { howToInvoke } from './call-tab.ts';
 import { getSettings, saveSettings, deleteAll, getState, commit, type Theme } from './data.ts';
 import * as S from './store.ts';
 import { listeningCandidate, stoppedNote } from './interview-view.ts';
@@ -34,6 +35,7 @@ function open() {
   select('setRetention').value = String(s.retentionDays);
   markTheme(s.theme);
   openSheet('settingsSheet');
+  void actionShortcut().then((shortcut) => ($('setHowInvoke').textContent = howToInvoke(shortcut)));
 }
 
 function markTheme(value: string) {

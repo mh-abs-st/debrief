@@ -18,3 +18,18 @@ test('an address we can’t read keeps listening', () => {
   assert.equal(leftCallSite('https://meet.google.com/abc', ''), false);
   assert.equal(leftCallSite('', 'https://meet.google.com/abc'), false);
 });
+
+import { howToInvoke, needsOkMessage } from '../src/call-tab.ts';
+
+test('the Chrome-needs-your-OK message names the keyboard shortcut when there is one', () => {
+  assert.equal(
+    needsOkMessage('Alt+Shift+D'),
+    'Chrome needs your OK for this tab. Click the Debrief icon in the toolbar, or press Alt+Shift+D, while you’re on the call tab, then press Start listening again. The panel stays open.',
+  );
+  assert.match(needsOkMessage('⌥⇧D'), /or press ⌥⇧D,/);
+});
+
+test('without a shortcut, it says where to set one', () => {
+  assert.equal(howToInvoke(''), 'click the Debrief icon in the toolbar while you’re on the call tab (you can set a keyboard shortcut at chrome://extensions/shortcuts)');
+  assert.doesNotMatch(needsOkMessage(''), /press  |undefined/);
+});

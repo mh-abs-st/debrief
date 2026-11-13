@@ -26,6 +26,15 @@
     "service_worker": "background.js",
     "type": "module"
   },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Shift+D",
+        "mac": "Alt+Shift+D"
+      },
+      "description": "Open Debrief on this tab (lets it listen to the call)"
+    }
+  },
   "side_panel": {
     "default_path": "panel.html"
   },

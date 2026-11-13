@@ -33,6 +33,14 @@ interface TabAudioConstraints {
 
 // Starts listening to one tab. Calls onTranscript(transcript) as lines arrive and onStatus(text, isError).
 // Returns { stop() }. Throws a user-facing Error if it can't start.
+// Chrome refused the tab: the Debrief icon (or its keyboard shortcut) wasn't used on it yet.
+export class NeedsOkError extends Error {
+  constructor() {
+    super('Chrome needs your OK for this tab.');
+    this.name = 'NeedsOkError';
+  }
+}
+
 export async function startListening({ tabId, language = 'en', transcript: initial, withMic = false, onMicProblem, getKey, onTranscript, onStatus }: ListenOptions): Promise<Listening> {
   // 1. Get the tab's audio. The tab goes quiet for the user, so we also play it back below.
   // Chrome only allows this after the Debrief icon was clicked on that tab (it grants access to the tab).
@@ -41,7 +49,7 @@ export async function startListening({ tabId, language = 'en', transcript: initi
     streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
   } catch (err) {
     console.warn('[debrief] tab capture refused:', err);
-    throw new Error('Chrome needs your OK for this tab. Click the Debrief icon in the toolbar while you’re on the call tab, then press Start listening again. The panel stays open.');
+    throw new NeedsOkError(); // the panel words it, with the keyboard shortcut (call-tab.ts)
   }
   const constraints: TabAudioConstraints = {
     audio: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: streamId } },
