@@ -16,6 +16,7 @@
   --warn-bg: #fff4dc;
   --warn-text: #6b4a00;
   --danger: #b4233a;
+  --on-danger: #ffffff;
   --radius: 10px;
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   color-scheme: light;
@@ -36,6 +37,7 @@
     --warn-bg: #3a2f14;
     --warn-text: #f3d68f;
     --danger: #ff7b8c;
+    --on-danger: #1f0a0e;
     color-scheme: dark;
   }
 }
@@ -53,6 +55,7 @@
   --warn-bg: #3a2f14;
   --warn-text: #f3d68f;
   --danger: #ff7b8c;
+  --on-danger: #1f0a0e;
   color-scheme: dark;
 }
 
@@ -251,4 +254,13 @@ dialog.sheet::backdrop { background: rgb(10 20 20 / 0.45); }
   background: var(--text); color: var(--bg); padding: 10px 12px; border-radius: 9px; font-size: 13px;
   box-shadow: 0 6px 20px rgb(0 0 0 / 0.25);
 }
-.toast.error { background: var(--danger); color: #fff; }
+.toast.error { background: var(--danger); color: var(--on-danger); }
+.toast:not([hidden]) { display: flex; align-items: flex-start; gap: 8px; }
+.toast-text { flex: 1; margin: 0; }
+.toast-close {
+  flex: none; display: grid; place-items: center; width: 24px; height: 24px; margin: -3px -5px -3px 0;
+  padding: 0; border: 0; border-radius: 6px; background: transparent; color: inherit; cursor: pointer;
+}
+.toast-close svg { width: 16px; height: 16px; }
+.toast-close:hover { background: color-mix(in srgb, currentColor 18%, transparent); }
+.toast-close:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
