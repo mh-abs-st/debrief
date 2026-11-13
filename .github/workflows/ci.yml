@@ -1,0 +1,71 @@
+# Tests, type checks and the extension build, on pushes to main and on every pull request.
+# No secrets, network calls to Anthropic or Deepgram, or Chrome needed: the tests fake them.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch or pull request cancels the run that's still going.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Server (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24] # package.json needs Node 22.18 or later
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+
+  extension:
+    name: Extension (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+      # dist/ ready to load unpacked in chrome://extensions (one copy is enough).
+      - if: matrix.node == 22
+        uses: actions/upload-artifact@v6
+        with:
+          name: debrief-extension-${{ github.sha }}
+          path: extension/dist/
+          if-no-files-found: error
+          retention-days: 14

@@ -53,7 +53,7 @@ Everything is TypeScript. The server and the tests run the `.ts` files directly 
    npm start              # node --env-file=.env index.ts
    ```
 
-2. Tests and type checks (no network, API keys or Chrome needed):
+2. Tests and type checks (no network, API keys or Chrome needed). GitHub Actions runs the same, plus the extension build, on every pull request and push to `main` (`.github/workflows/ci.yml`, Node 22 and 24); the built `dist/` is attached to each run, ready to load unpacked:
 
    ```bash
    cd server && npm test && npm run typecheck
