@@ -36,6 +36,9 @@ export interface Plan {
   opening: string;
   skills: PlanSkill[];
   verify: Array<{ claim: string; question: string }>;
+  // The job's skill names when the plan was made, so we can tell when they've changed since.
+  // Plans saved before this field existed don't have it.
+  madeFromSkills?: string[];
 }
 
 export interface Candidate {
@@ -230,6 +233,21 @@ export function updateCandidate(state: State, id: string, fields: CandidateField
     return next;
   });
   return { ...state, candidates };
+}
+
+// A plan from the server, marked with the job's skills it was made from.
+export function planForJob(plan: Plan, job: Job): Plan {
+  return { ...plan, madeFromSkills: job.skills.map((sk) => sk.name) };
+}
+
+// True when the job's skills changed after this candidate's plan was made: one added, removed or renamed.
+// Order and capitals don't count. Older plans without madeFromSkills use the skills the plan lists,
+// which the server keeps in the job's names (server/lib/plan.ts).
+export function planOutOfDate(job: Job, cand: Candidate): boolean {
+  if (!cand.plan) return false;
+  const key = (names: string[]) => names.map((n) => n.trim().toLowerCase()).sort().join('\n');
+  const madeFrom = cand.plan.madeFromSkills ?? cand.plan.skills.map((sk) => sk.name);
+  return key(madeFrom) !== key(job.skills.map((sk) => sk.name));
 }
 
 // Deleting a candidate deletes everything about them: profile, resume, plan and interview notes.
