@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createApp } from '../lib/app.ts';
 import { parseJsonObject, cleanSkills, cleanFollowups, FOLLOWUP_SYSTEM } from '../lib/prompts.ts';
 import { auth, json, listen, start as startApp, TOKEN, type StartOptions } from './helpers.ts';
+import { makeLimits, DEFAULT_LIMITS } from '../lib/limits.ts';
 
 const models = { fast: 'test-fast-model' };
 
@@ -189,5 +190,98 @@ test('transcribe token: unavailable when no Deepgram key is configured', async (
     assert.equal(res.status, 503);
   } finally {
     await app.close();
+  }
+});
+
+// ---------- Rate limits and usage ----------
+
+test('limits: the 3rd AI call in a minute is refused with 429, Retry-After and a plain message', async () => {
+  const limits = makeLimits({ ...DEFAULT_LIMITS, aiPerMinute: 2 });
+  const { post, calls, close } = await start({ reply: '{"questions":["Why?"]}', limits });
+  try {
+    const ask = () => post('/api/followups', { skill: 'SQL', answer: 'We added an index.' });
+    assert.equal((await ask()).status, 200);
+    assert.equal((await ask()).status, 200);
+    const res = await ask();
+    assert.equal(res.status, 429);
+    assert.equal(res.headers.get('retry-after'), '60');
+    const body = await json(res);
+    assert.equal(body.error, 'rate_limited');
+    assert.match(body.message, /Wait a minute/);
+    assert.equal(calls.length, 2); // the AI wasn't called the 3rd time
+  } finally {
+    await close();
+  }
+});
+
+test('limits: a request missing fields isn’t counted', async () => {
+  const limits = makeLimits({ ...DEFAULT_LIMITS, aiPerMinute: 1 });
+  const { post, close } = await start({ reply: '{"skills":[]}', limits });
+  try {
+    assert.equal((await post('/api/skills', {})).status, 400);
+    assert.equal((await post('/api/skills', { jobDescription: 'Backend role' })).status, 200);
+  } finally {
+    await close();
+  }
+});
+
+test('limits: the daily cap says when it resets; speech keys have their own limit', async () => {
+  const limits = makeLimits({ ...DEFAULT_LIMITS, aiPerDay: 1, keysPerMinute: 1 });
+  const grantKey = async () => ({ key: 'k', expiresIn: 60 });
+  const { post, close } = await start({ reply: '{"skills":[]}', limits, grantKey });
+  try {
+    assert.equal((await post('/api/skills', { jobDescription: 'Backend role' })).status, 200);
+    const capped = await post('/api/skills', { jobDescription: 'Backend role' });
+    assert.equal(capped.status, 429);
+    assert.match((await json(capped)).message, /today’s usage limit/);
+    assert.equal((await post('/api/transcribe-token', {})).status, 200);
+    assert.equal((await post('/api/transcribe-token', {})).status, 429);
+  } finally {
+    await close();
+  }
+});
+
+test('limits: too many wrong tokens make the client wait, even with the right one', async () => {
+  const limits = makeLimits({ ...DEFAULT_LIMITS, badTokenPerMinute: 2 });
+  const { post, close } = await start({ reply: '{"skills":[]}', limits });
+  try {
+    const wrong = { Authorization: 'Bearer nope', 'Content-Type': 'application/json' };
+    assert.equal((await post('/api/skills', { jobDescription: 'x' }, wrong)).status, 401);
+    assert.equal((await post('/api/skills', { jobDescription: 'x' }, wrong)).status, 401);
+    const res = await post('/api/skills', { jobDescription: 'x' });
+    assert.equal(res.status, 429);
+    assert.match((await json(res)).message, /wrong app token/);
+  } finally {
+    await close();
+  }
+});
+
+test('limits: behind a proxy, each visitor is limited on their own', async () => {
+  const limits = makeLimits({ ...DEFAULT_LIMITS, aiPerMinute: 1 });
+  const { post, close } = await start({ reply: '{"skills":[]}', limits, trustProxy: true });
+  try {
+    const from = (ip: string) => ({ ...auth, 'X-Forwarded-For': `${ip}, 10.0.0.1` });
+    assert.equal((await post('/api/skills', { jobDescription: 'x' }, from('203.0.113.1'))).status, 200);
+    assert.equal((await post('/api/skills', { jobDescription: 'x' }, from('203.0.113.2'))).status, 200);
+    assert.equal((await post('/api/skills', { jobDescription: 'x' }, from('203.0.113.1'))).status, 429);
+  } finally {
+    await close();
+  }
+});
+
+test('usage: counts per day behind the app token, no content', async () => {
+  const limits = makeLimits();
+  const { base, post, close } = await start({ reply: '{"skills":[]}', limits });
+  try {
+    await post('/api/skills', { jobDescription: 'Secret job text' });
+    assert.equal((await fetch(`${base}/api/usage`)).status, 401);
+    const res = await fetch(`${base}/api/usage`, { headers: auth });
+    const body = await json(res);
+    assert.equal(res.status, 200);
+    assert.deepEqual(body.days[0].counts, { skills: 1, aiCalls: 1 });
+    assert.equal(body.limits.aiPerMinute, DEFAULT_LIMITS.aiPerMinute);
+    assert.doesNotMatch(JSON.stringify(body), /Secret/);
+  } finally {
+    await close();
   }
 });
