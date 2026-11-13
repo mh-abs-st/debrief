@@ -141,6 +141,9 @@ p { margin: 0 0 8px; }
 .back { display: inline-flex; align-items: center; gap: 2px; align-self: flex-start; margin-left: -6px; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .row.end { justify-content: flex-end; }
+.spacer { flex: 1; }
+.card.editing { border-color: var(--accent); }
+.card.editing > .row { margin-top: 12px; }
 .footer-actions { justify-content: space-between; }
 .file-btn { align-self: flex-start; }
 .file-btn.busy { opacity: 0.6; pointer-events: none; }

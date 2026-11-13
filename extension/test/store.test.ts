@@ -234,3 +234,51 @@ test('normalize repairs missing or damaged stored data', () => {
   assert.deepEqual(S.normalize(null), S.emptyState());
   assert.deepEqual(S.normalize({ jobs: 'x' }), S.emptyState());
 });
+
+test('a finished interview’s notes and ticks can be edited, and the candidate counts as changed', () => {
+  let { state, ana } = seed();
+  const started = S.startInterview(state, ana.id, 1000);
+  state = S.setSkillNotes(started.state, started.interview.id, 0, 'first draft');
+  state = S.endInterview(state, started.interview.id, 2000);
+  const skills = state.interviews.find((i) => i.id === started.interview.id)!.skills;
+  state = S.editInterviewNotes(
+    state,
+    started.interview.id,
+    { skills: [{ covered: true, notes: '  Tidied note  ' }, ...skills.slice(1).map(() => ({ covered: false, notes: '' })), { covered: true, notes: 'ignored extra' }], generalNotes: 'Strong on SQL' },
+    5000,
+  );
+  const iv = state.interviews.find((i) => i.id === started.interview.id)!;
+  assert.deepEqual(iv.skills.map((s) => s.name), skills.map((s) => s.name)); // names unchanged
+  assert.equal(iv.skills[0].notes, 'Tidied note');
+  assert.equal(iv.skills[0].covered, true);
+  assert.equal(iv.skills.length, skills.length);
+  assert.equal(iv.generalNotes, 'Strong on SQL');
+  assert.equal(iv.endedAt, 2000); // still finished, same time
+  assert.equal(S.getCandidate(state, ana.id)!.updatedAt, 5000);
+  assert.equal(S.editInterviewNotes(state, 'nope', { skills: [], generalNotes: '' }), state);
+});
+
+test('deleting an interview; the last finished one takes the candidate back from Interviewed', () => {
+  let { state, ana } = seed();
+  state = S.updateCandidate(state, ana.id, { interviewAt: '2026-11-20T10:00' });
+  const a = S.startInterview(state, ana.id, 1000);
+  state = S.endInterview(a.state, a.interview.id, 2000);
+  const b = S.startInterview(state, ana.id, 3000);
+  state = S.endInterview(b.state, b.interview.id, 4000);
+  assert.equal(S.getCandidate(state, ana.id)!.stage, 'interviewed');
+
+  state = S.deleteInterview(state, b.interview.id);
+  assert.equal(state.interviews.some((i) => i.id === b.interview.id), false);
+  assert.equal(S.getCandidate(state, ana.id)!.stage, 'interviewed'); // one finished interview left
+  state = S.deleteInterview(state, a.interview.id);
+  assert.equal(S.interviewsFor(state, ana.id).length, 0);
+  assert.equal(S.getCandidate(state, ana.id)!.stage, 'scheduled'); // has a date
+
+  // A decision stays.
+  const c = S.startInterview(state, ana.id, 5000);
+  state = S.endInterview(c.state, c.interview.id, 6000);
+  state = S.updateCandidate(state, ana.id, { stage: 'decided' });
+  state = S.deleteInterview(state, c.interview.id);
+  assert.equal(S.getCandidate(state, ana.id)!.stage, 'decided');
+  assert.equal(S.deleteInterview(state, 'nope'), state);
+});

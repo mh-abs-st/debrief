@@ -319,6 +319,39 @@ export function endInterview(state: State, interviewId: string, now: number = Da
   return next;
 }
 
+// Changing a finished interview's notes and ticks afterwards (Notes part). Skill names stay as they were;
+// entries beyond the interview's skills are ignored. Counts as a change to the candidate for retention.
+export interface NotesEdit {
+  skills: Array<{ covered: boolean; notes: string }>;
+  generalNotes: string;
+}
+
+export function editInterviewNotes(state: State, interviewId: string, edit: NotesEdit, now: number = Date.now()): State {
+  const iv = state.interviews.find((i) => i.id === interviewId);
+  if (!iv) return state;
+  const next = updateInterview(state, interviewId, (x) => ({
+    ...x,
+    skills: x.skills.map((s, i) => {
+      const e = edit.skills[i];
+      return e ? { ...s, covered: Boolean(e.covered), notes: clip(e.notes, LIMITS.notes) } : s;
+    }),
+    generalNotes: clip(edit.generalNotes, LIMITS.notes),
+  }));
+  return updateCandidate(next, iv.candidateId, {}, now);
+}
+
+// Deleting one interview (a test run, say). If it was the candidate's last finished interview and they're
+// still "Interviewed", they go back to Scheduled (with a date) or New. A decision you made stays.
+export function deleteInterview(state: State, interviewId: string, now: number = Date.now()): State {
+  const iv = state.interviews.find((i) => i.id === interviewId);
+  if (!iv) return state;
+  let next: State = { ...state, interviews: state.interviews.filter((i) => i.id !== interviewId) };
+  const c = getCandidate(next, iv.candidateId);
+  const anyFinished = next.interviews.some((i) => i.candidateId === iv.candidateId && i.endedAt);
+  if (c && c.stage === 'interviewed' && !anyFinished) next = updateCandidate(next, c.id, { stage: c.interviewAt ? 'scheduled' : 'new' }, now);
+  return next;
+}
+
 export function interviewsFor(state: State, candidateId: string): Interview[] {
   return state.interviews.filter((i) => i.candidateId === candidateId).sort((a, b) => b.startedAt - a.startedAt);
 }
