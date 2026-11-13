@@ -19,37 +19,14 @@ Checked in a browser with a fake server and fake Chrome APIs. The Deepgram tempo
 
 ## To-Do
 
-The backlog is in [GitHub Issues](https://github.com/mh-abs-st/debrief/issues): one issue per task, labelled `bug`, `enhancement`, `research`, `compliance`, `privacy` and `priority: high`. Add new work there, not here. As of 2026-11-05:
+The backlog is in [GitHub Issues](https://github.com/mh-abs-st/debrief/issues), grouped by the milestones from `docs/plan.md`:
 
-**First (`priority: high`)**
-- [#1](https://github.com/mh-abs-st/debrief/issues/1) Deleting the current candidate while listening keeps transcribing the call
-- [#2](https://github.com/mh-abs-st/debrief/issues/2) Save failures are silent, and storage is capped at 10 MB
-- [#7](https://github.com/mh-abs-st/debrief/issues/7) Test a real call end to end (Google Meet first)
-- [#9](https://github.com/mh-abs-st/debrief/issues/9) Show a clear recording indicator, and stop listening when the call tab closes
+- **[P0 Prove it works](https://github.com/mh-abs-st/debrief/milestone/1):** a real call, 10 buyer interviews, the first bugs.
+- **[P1 Private beta](https://github.com/mh-abs-st/debrief/milestone/2):** hosting, rate limits, candidate notice, DPIA, 10 design partners.
+- **[P2 Paid launch](https://github.com/mh-abs-st/debrief/milestone/3):** sign-in and billing, website, client write-up.
+- **[P3 Grow](https://github.com/mh-abs-st/debrief/milestone/4):** calendar, interview kits, more channels.
 
-**Bugs**
-- [#3](https://github.com/mh-abs-st/debrief/issues/3) Error messages never go away and cover the page
-- [#4](https://github.com/mh-abs-st/debrief/issues/4) Adding an interview date to an existing candidate doesn't move them to Scheduled
-- [#5](https://github.com/mh-abs-st/debrief/issues/5) Interview plan isn't marked out of date when the job's skills change
-- [#6](https://github.com/mh-abs-st/debrief/issues/6) Notes typed just before closing the panel can be lost
-
-**Product**
-- [#10](https://github.com/mh-abs-st/debrief/issues/10) Capture the interviewer's microphone too, with speaker labels
-- [#11](https://github.com/mh-abs-st/debrief/issues/11) Back up and restore all data
-- [#12](https://github.com/mh-abs-st/debrief/issues/12) Edit notes after an interview ends, and delete a single interview
-- [#15](https://github.com/mh-abs-st/debrief/issues/15) Keyboard shortcut to open Debrief on the call tab
-- [#16](https://github.com/mh-abs-st/debrief/issues/16) Fill interview dates from a calendar
-- [#17](https://github.com/mh-abs-st/debrief/issues/17) German interface
-- [#18](https://github.com/mh-abs-st/debrief/issues/18) Sign-in and billing instead of the shared app token
-
-**Engineering**
-- [#13](https://github.com/mh-abs-st/debrief/issues/13) Run tests, type checks and the build on every push
-- [#14](https://github.com/mh-abs-st/debrief/issues/14) Add extension icons and a Chrome Web Store package
-
-**Before real candidate data**
-- [#8](https://github.com/mh-abs-st/debrief/issues/8) Tune the plan and resume prompts on real resumes
-- [#19](https://github.com/mh-abs-st/debrief/issues/19) Processor agreements, candidate notice and DPIA
-- [#20](https://github.com/mh-abs-st/debrief/issues/20) Talk to 8 to 10 small-company founders or agency leads
+Labels: `bug`, `enhancement`, `research`, `compliance`, `privacy`, `go-to-market`, `priority: high`. Add new work there, with a milestone, not here.
 
 ## Out of scope for MVP
 
@@ -68,4 +45,4 @@ The backlog is in [GitHub Issues](https://github.com/mh-abs-st/debrief/issues): 
 
 ## Validation before building further
 
-Talk to 8 to 10 small-company founders or agency leads who run interviews. Ask whether they would pay monthly, and what their current notes look like. If they would not pay for notes and coverage, stop.
+Talk to 10 buyers, about 6 small agencies and 4 founders (#20). Ask whether they would pay, and what their current notes look like. If fewer than 5 of 10 show a clear pay signal, stop. The gates for later phases are in `docs/plan.md`.
