@@ -12,3 +12,16 @@ export function leftCallSite(callUrl: string, nextUrl: string): boolean {
 
 // The text on the toolbar icon while listening. "LIVE", not "REC": nothing is recorded.
 export const LISTENING_BADGE = 'LIVE';
+
+// How to give Debrief the tab: the toolbar icon, or the keyboard shortcut Chrome has for it.
+// shortcut is what chrome.commands reports ('' when unset, for example when another extension has the keys).
+export function howToInvoke(shortcut: string): string {
+  return shortcut
+    ? `click the Debrief icon in the toolbar, or press ${shortcut}, while you’re on the call tab`
+    : 'click the Debrief icon in the toolbar while you’re on the call tab (you can set a keyboard shortcut at chrome://extensions/shortcuts)';
+}
+
+export function needsOkMessage(shortcut: string): string {
+  const how = howToInvoke(shortcut);
+  return `Chrome needs your OK for this tab. ${how[0].toUpperCase()}${how.slice(1)}, then press Start listening again. The panel stays open.`;
+}

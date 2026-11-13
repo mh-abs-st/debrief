@@ -193,3 +193,13 @@ export async function withBusy<T>(button: HTMLButtonElement, label: string, task
 // The message to show for something caught: our own errors already carry a friendly one.
 export const errorMessage = (err: unknown, fallback = 'Something went wrong. Please try again.'): string =>
   err instanceof Error && err.message ? err.message : fallback;
+
+// The keyboard shortcut that opens Debrief on a tab, as Chrome shows it ('' if none is set).
+export async function actionShortcut(): Promise<string> {
+  try {
+    const commands = await chrome.commands.getAll();
+    return commands.find((c) => c.name === '_execute_action')?.shortcut || '';
+  } catch {
+    return '';
+  }
+}

@@ -1,11 +1,11 @@
 // Interview section of a candidate's page: the interview itself. Checklist and notes, the live transcript,
 // follow-up suggestions and the questions from the plan.
-import { $, el, toast, confirmSheet, fillSelect, withBusy, errorMessage } from './ui.ts';
+import { $, el, toast, confirmSheet, fillSelect, withBusy, errorMessage, actionShortcut } from './ui.ts';
 import { getState, getSettings, saveSettings, commit, commitSoon, savePendingNow, subscribe } from './data.ts';
 import { api } from './api.ts';
-import { startListening, type Listening } from './capture.ts';
+import { startListening, NeedsOkError, type Listening } from './capture.ts';
 import { emptyTranscript, recentText, transcriptText, lastQuestion, SPEAKER_LABELS } from './transcript.ts';
-import { leftCallSite, LISTENING_BADGE } from './call-tab.ts';
+import { leftCallSite, needsOkMessage, LISTENING_BADGE } from './call-tab.ts';
 import * as S from './store.ts';
 
 let candidateId = ''; // the candidate this section shows
@@ -308,7 +308,8 @@ async function start() {
   } catch (err) {
     listening = null;
     listeningFor = '';
-    toast(errorMessage(err, 'We couldn’t start listening. Please try again.'), { error: true });
+    const message = err instanceof NeedsOkError ? needsOkMessage(await actionShortcut()) : errorMessage(err, 'We couldn’t start listening. Please try again.');
+    toast(message, { error: true });
   }
   updateListenButtons();
 }
