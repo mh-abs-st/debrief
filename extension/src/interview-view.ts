@@ -1,7 +1,7 @@
 // Interview section of a candidate's page: the interview itself. Checklist and notes, the live transcript,
 // follow-up suggestions and the questions from the plan.
 import { $, el, toast, confirmSheet, fillSelect, withBusy, errorMessage } from './ui.ts';
-import { getState, getSettings, commit, commitSoon, subscribe } from './data.ts';
+import { getState, getSettings, commit, commitSoon, savePendingNow, subscribe } from './data.ts';
 import { api } from './api.ts';
 import { startListening, type Listening } from './capture.ts';
 import { emptyTranscript, recentText, transcriptText } from './transcript.ts';
@@ -44,6 +44,7 @@ export function initInterview(options: { onEnd: (candidateId: string) => void })
     const iv = currentInterview();
     if (iv) commitSoon(S.setGeneralNotes(getState(), iv.id, (e.target as HTMLTextAreaElement).value));
   });
+  textarea('liveGeneral').addEventListener('change', () => void savePendingNow()); // left the field: save now
   $('liveCopy').addEventListener('click', () => {
     const iv = currentInterview();
     if (iv) copy(S.interviewMarkdown(getState(), iv.id), 'Notes copied.');
@@ -144,6 +145,7 @@ function renderChecklist(iv: S.Interview) {
         'aria-label': `Notes for ${s.name}`,
         value: s.notes,
         oninput: (e: Event) => commitSoon(S.setSkillNotes(getState(), iv.id, i, (e.target as HTMLTextAreaElement).value)),
+        onchange: () => void savePendingNow(), // left the field: save now
       });
       return el(
         'li',

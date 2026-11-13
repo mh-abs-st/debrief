@@ -71,6 +71,7 @@ export function onSaveError(fn: (err: unknown) => void): void {
 export async function commit(next: State, { quiet = false }: { quiet?: boolean } = {}): Promise<boolean> {
   state = next;
   clearTimeout(timer); // this save includes anything typed since
+  timer = undefined;
   const saved = await write();
   if (!quiet) listeners.forEach((fn) => fn(state));
   return saved;
@@ -102,6 +103,7 @@ export async function saveSettings(changes: Partial<Settings>): Promise<boolean>
 // next time, so the usual "will be lost" message would be wrong.
 export async function deleteAll(): Promise<boolean> {
   clearTimeout(timer);
+  timer = undefined;
   let removed = true;
   try {
     await chrome.storage.local.remove(DATA_KEY);
@@ -118,5 +120,18 @@ export async function deleteAll(): Promise<boolean> {
 export function commitSoon(next: State): void {
   state = next;
   clearTimeout(timer);
-  timer = setTimeout(write, 400);
+  timer = setTimeout(() => {
+    timer = undefined;
+    void write();
+  }, 400);
+}
+
+// Saves what commitSoon() is still holding back, right now: for when the panel closes or is hidden,
+// or a notes field loses focus. True when nothing was waiting or the save worked; failures are
+// reported like any save.
+export function savePendingNow(): Promise<boolean> {
+  if (timer === undefined) return Promise.resolve(true);
+  clearTimeout(timer);
+  timer = undefined;
+  return write();
 }
