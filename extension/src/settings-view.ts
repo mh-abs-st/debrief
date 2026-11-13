@@ -1,7 +1,8 @@
 // Settings sheet: server connection, transcription language, theme, how long candidate data is kept,
-// and deleting everything.
-import { $, toast, openSheet, confirmSheet, closestTarget, type Nav } from './ui.ts';
-import { getSettings, saveSettings, deleteAll, getState, type Theme } from './data.ts';
+// backing up and restoring, and deleting everything.
+import { $, el, toast, openSheet, confirmSheet, closestTarget, formatDate, type Nav } from './ui.ts';
+import { getSettings, saveSettings, deleteAll, getState, commit, type Theme } from './data.ts';
+import * as S from './store.ts';
 import { listeningCandidate, stoppedNote } from './interview-view.ts';
 
 const input = (id: string) => $<HTMLInputElement>(id);
@@ -17,6 +18,8 @@ export function initSettings(nav: Nav): void {
     markTheme(btn.dataset.v || 'system');
   });
   $('setDeleteAll').addEventListener('click', removeEverything);
+  $('setBackup').addEventListener('click', downloadBackup);
+  input('setRestoreFile').addEventListener('change', restoreBackup);
   $('setDemo').addEventListener('click', () => {
     sheet().close();
     nav.demo();
@@ -83,4 +86,56 @@ async function removeEverything() {
   }
   sheet().close();
   toast('All jobs, candidates and notes deleted.' + stoppedNote(listened));
+}
+
+// ---------- Backup and restore ----------
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+function downloadBackup() {
+  const state = getState();
+  if (!state.jobs.length) return toast('Nothing to back up yet. Add a job first.');
+  const blob = new Blob([JSON.stringify(S.makeBackup(state), null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = el('a', { href: url, download: S.backupFileName() });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  toast(`Backup downloaded: ${plural(state.jobs.length, 'job')} and ${plural(state.candidates.length, 'candidate')}. It contains candidate data, so keep it somewhere safe.`);
+}
+
+async function restoreBackup() {
+  const fileInput = input('setRestoreFile');
+  const file = fileInput.files?.[0];
+  fileInput.value = ''; // choosing the same file again still works
+  if (!file) return;
+  if (file.size > 50 * 1024 * 1024) return toast('That file is too big to be a Debrief backup.', { error: true });
+  const read = S.readBackup(await file.text());
+  if ('error' in read) return toast(read.error, { error: true });
+
+  const now = getState();
+  const listened = listeningCandidate();
+  const from = read.exportedAt ? ` from ${formatDate(read.exportedAt)}` : '';
+  const ok = await confirmSheet({
+    title: 'Replace your data with this backup?',
+    body:
+      `The backup${from} has ${plural(read.state.jobs.length, 'job')} and ${plural(read.state.candidates.length, 'candidate')}. ` +
+      `It replaces the ${plural(now.jobs.length, 'job')} and ${plural(now.candidates.length, 'candidate')} on this computer, with their notes. Your settings stay.` +
+      (listened ? ' Debrief stops listening if that candidate isn’t in the backup.' : ''),
+    yes: 'Replace my data',
+    no: 'Cancel',
+  });
+  if (!ok) return;
+
+  // The retention setting applies to restored data too.
+  const { state, removed } = S.purgeExpired(read.state, getSettings().retentionDays);
+  if (!(await commit(state))) return; // the save error is on screen; nothing was replaced on disk
+  sheet().close();
+  const notes = [
+    `Restored ${plural(state.jobs.length, 'job')} and ${plural(state.candidates.length, 'candidate')}.`,
+    removed ? `${plural(removed, 'candidate')} older than your Settings allow ${removed === 1 ? 'was' : 'were'} removed.` : '',
+    read.skipped ? `${read.skipped} damaged ${read.skipped === 1 ? 'entry' : 'entries'} skipped.` : '',
+  ];
+  toast(notes.filter(Boolean).join(' ') + stoppedNote(listened));
 }

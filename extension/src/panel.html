@@ -316,6 +316,14 @@
           <p class="help">Deleting a candidate removes their resume, plan and notes. Check how long your company may keep candidate data.</p>
           <button class="link-btn danger" id="setDeleteAll" type="button">Delete all jobs, candidates and notes</button>
         </fieldset>
+        <fieldset>
+          <legend>Backup</legend>
+          <p class="help">Jobs, candidates and notes are saved only on this computer. Download a backup to keep a copy or move to another computer. The file contains candidate data: keep it somewhere safe. Settings and your app token aren’t in it.</p>
+          <div class="row">
+            <button class="soft-btn" id="setBackup" type="button">Download a backup</button>
+            <label class="file-btn soft-btn" id="setRestoreLabel">Restore from a backup<input id="setRestoreFile" type="file" accept=".json,application/json" hidden /></label>
+          </div>
+        </fieldset>
         <details class="guide">
           <summary>How to use Debrief</summary>
           <ol>
