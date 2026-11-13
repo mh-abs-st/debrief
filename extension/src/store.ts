@@ -199,12 +199,14 @@ export function addCandidate(state: State, jobId: string, fields: CandidateField
     email: clip(fields.email, LIMITS.email),
     profileUrl: cleanUrl(fields.profileUrl),
     resumeText: clip(fields.resumeText, LIMITS.resume),
-    stage: isStage(fields.stage) ? fields.stage : 'new',
+    stage: 'new',
     interviewAt: clip(fields.interviewAt, 40),
     plan: null,
     createdAt: now,
     updatedAt: now,
   };
+  // A stage you chose wins; otherwise a date means the interview is scheduled.
+  candidate.stage = isStage(fields.stage) ? fields.stage : candidate.interviewAt ? 'scheduled' : 'new';
   return { state: { ...state, candidates: [...state.candidates, candidate] }, candidate };
 }
 
@@ -221,6 +223,9 @@ export function updateCandidate(state: State, id: string, fields: CandidateField
     }
     if ('stage' in fields && isStage(fields.stage)) next.stage = fields.stage;
     if ('interviewAt' in fields) next.interviewAt = clip(fields.interviewAt, 40);
+    // Adding a date to a New candidate schedules them, unless a stage was chosen in the same change.
+    // Other stages stay as they are: a date added to someone Interviewed or Decided doesn't move them back.
+    if (!c.interviewAt && next.interviewAt && next.stage === 'new' && !isStage(fields.stage)) next.stage = 'scheduled';
     if ('plan' in fields) next.plan = fields.plan || null;
     return next;
   });

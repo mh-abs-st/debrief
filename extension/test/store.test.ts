@@ -102,6 +102,37 @@ test('notes export: only what was written, no assessment', () => {
   assert.doesNotMatch(md, /score|rating|fit/i);
 });
 
+test('a date schedules a New candidate, when adding or editing', () => {
+  let { state, job, ana, ben } = seed();
+  // Adding: a date means Scheduled, no date means New, a chosen stage wins.
+  const dated = S.addCandidate(state, job.id, { name: 'Cleo', interviewAt: '2026-11-10T10:00' });
+  assert.equal(dated.candidate.stage, 'scheduled');
+  assert.equal(S.addCandidate(state, job.id, { name: 'Dan' }).candidate.stage, 'new');
+  assert.equal(S.addCandidate(state, job.id, { name: 'Eve', interviewAt: '2026-11-10T10:00', stage: 'interviewed' }).candidate.stage, 'interviewed');
+
+  // Editing: adding a date to a New candidate moves them to Scheduled (the bug in #4).
+  assert.equal(ana.stage, 'new');
+  state = S.updateCandidate(state, ana.id, { name: 'Ana', interviewAt: '2026-11-10T10:00' });
+  assert.equal(S.getCandidate(state, ana.id)?.stage, 'scheduled');
+
+  // Other stages stay as they are.
+  state = S.updateCandidate(state, ben.id, { stage: 'interviewed' });
+  state = S.updateCandidate(state, ben.id, { interviewAt: '2026-11-12T10:00' });
+  assert.equal(S.getCandidate(state, ben.id)?.stage, 'interviewed');
+
+  // A stage chosen in the same change wins.
+  const fay = S.addCandidate(state, job.id, { name: 'Fay' });
+  state = S.updateCandidate(fay.state, fay.candidate.id, { interviewAt: '2026-11-10T10:00', stage: 'new' });
+  assert.equal(S.getCandidate(state, fay.candidate.id)?.stage, 'new');
+
+  // Changing an existing date, or saving without a date, doesn't touch the stage.
+  const gus = S.addCandidate(state, job.id, { name: 'Gus', interviewAt: '2026-11-10T10:00', stage: 'new' });
+  state = S.updateCandidate(gus.state, gus.candidate.id, { interviewAt: '2026-11-11T10:00' });
+  assert.equal(S.getCandidate(state, gus.candidate.id)?.stage, 'new');
+  state = S.updateCandidate(state, fay.candidate.id, { name: 'Fay', interviewAt: '' });
+  assert.equal(S.getCandidate(state, fay.candidate.id)?.stage, 'new');
+});
+
 test('upcoming groups candidates by interview day, running interviews first', () => {
   let { state, job } = seed();
   const add = (name: string, interviewAt: string, stage?: string) => {
