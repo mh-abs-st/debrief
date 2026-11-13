@@ -10,6 +10,9 @@ export const MESSAGES = {
   busy: 'We’re a little busy right now. Please try again in a few seconds.',
   generic: 'Something went wrong on our side. Please try again.',
   request: 'Something went wrong with this request. Please try again.',
+  tooMany: 'That’s a lot of requests in a short time. Wait a minute, then try again.',
+  tooManyTokens: 'Too many tries with a wrong app token. Wait a minute, check the token in Settings, then try again.',
+  dailyLimit: 'Debrief has reached today’s usage limit. It resets at midnight (UTC). Please try again then.',
 };
 
 // What we read from anything thrown: an Error, a provider error with a status, or a plain value.

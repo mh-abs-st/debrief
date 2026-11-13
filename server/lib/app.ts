@@ -6,6 +6,7 @@ import { RESUME_SYSTEM, MAX_PDF_BYTES, base64Bytes, resumeContent, resumeErrorMe
 import { friendlyAiError, friendlySpeechError, userMessage, asErrorLike, MESSAGES } from './aierrors.ts';
 import type { Complete } from './claude.ts';
 import type { GrantKey } from './deepgram.ts';
+import { makeLimits, type Limits, type Route } from './limits.ts';
 
 export const LIMITS = {
   jobDescription: 20_000,
@@ -24,6 +25,8 @@ export interface AppOptions {
   grantKey?: GrantKey | null;
   appToken?: string;
   models: { fast: string; assist?: string };
+  limits?: Limits; // rate limits and usage counts (limits.ts); the defaults when not given
+  trustProxy?: boolean; // behind a host's proxy: the client is the first X-Forwarded-For address
 }
 
 type Body = Record<string, unknown>;
@@ -38,8 +41,8 @@ function corsHeaders(origin: string | undefined): Record<string, string> {
   };
 }
 
-function send(res: http.ServerResponse, status: number, body: unknown, origin: string | undefined): void {
-  res.writeHead(status, { 'Content-Type': 'application/json', ...corsHeaders(origin) });
+function send(res: http.ServerResponse, status: number, body: unknown, origin: string | undefined, headers: Record<string, string> = {}): void {
+  res.writeHead(status, { 'Content-Type': 'application/json', ...corsHeaders(origin), ...headers });
   res.end(JSON.stringify(body));
 }
 
@@ -81,12 +84,22 @@ function skillsFrom(value: unknown): Skill[] {
 // createApp({ complete, grantKey, appToken, models }) → http.Server
 // complete({model, system, user, maxTokens}) → reply text. grantKey() → { key, expiresIn }. Both injected so
 // tests can fake the AI and Deepgram. models = { fast, assist }.
-export function createApp({ complete, grantKey, appToken = '', models }: AppOptions): http.Server {
+export function createApp({ complete, grantKey, appToken = '', models, limits = makeLimits(), trustProxy = false }: AppOptions): http.Server {
   const assist = models.assist || models.fast;
 
-  return http.createServer(async (req, res) => {
+  const server = http.createServer(async (req, res) => {
     const origin = req.headers.origin;
     const url = new URL(req.url || '/', 'http://localhost');
+    const client = clientOf(req, trustProxy);
+    const tooMany = (retryAfter: number, message: string) =>
+      send(res, 429, { error: 'rate_limited', message }, origin, { 'Retry-After': String(retryAfter) });
+    // Before each AI call or speech key: refused with 429 when this client, or everyone today, has had enough.
+    const allowed = (route: Route): boolean => {
+      const decision = limits.check(client, route);
+      if (decision.ok) return true;
+      tooMany(decision.retryAfter, decision.reason === 'daily' ? MESSAGES.dailyLimit : MESSAGES.tooMany);
+      return false;
+    };
 
     if (req.method === 'OPTIONS') {
       res.writeHead(204, corsHeaders(origin));
@@ -98,8 +111,16 @@ export function createApp({ complete, grantKey, appToken = '', models }: AppOpti
 
     // Everything below needs the app token. Without one configured, the API stays closed.
     if (!appToken) return send(res, 503, { error: 'not_configured', message: MESSAGES.unavailable }, origin);
+    const guessing = limits.guessing(client);
+    if (!guessing.ok) return tooMany(guessing.retryAfter, MESSAGES.tooManyTokens);
     if (!tokenMatches(req.headers.authorization, appToken)) {
+      limits.wrongToken(client);
       return send(res, 401, { error: 'unauthorized', message: 'The app token is wrong. Check it in Settings.' }, origin);
+    }
+
+    // Usage counts for the last 7 days (counts only, no content), and the limits in force.
+    if (req.method === 'GET' && url.pathname === '/api/usage') {
+      return send(res, 200, { days: limits.usage.report(), limits: limits.config }, origin);
     }
 
     try {
@@ -107,6 +128,7 @@ export function createApp({ complete, grantKey, appToken = '', models }: AppOpti
         const body = await readJson(req);
         const jobDescription = text(body.jobDescription, LIMITS.jobDescription);
         if (!jobDescription) return send(res, 400, { error: 'missing_job', message: 'Paste the job description first.' }, origin);
+        if (!allowed('skills')) return;
         const reply = await complete({ model: models.fast, system: SKILLS_SYSTEM, user: skillsUser(jobDescription), maxTokens: 700 });
         return send(res, 200, { skills: cleanSkills(parseJsonObject(reply)) }, origin);
       }
@@ -117,6 +139,7 @@ export function createApp({ complete, grantKey, appToken = '', models }: AppOpti
         const answer = text(body.answer, LIMITS.answer);
         const question = text(body.question, LIMITS.question);
         if (!skill || !answer) return send(res, 400, { error: 'missing_fields', message: 'Add the skill and the answer first.' }, origin);
+        if (!allowed('followups')) return;
         const reply = await complete({ model: models.fast, system: FOLLOWUP_SYSTEM, user: followupUser({ skill, question, answer }), maxTokens: 300 });
         return send(res, 200, { questions: cleanFollowups(parseJsonObject(reply)) }, origin);
       }
@@ -127,6 +150,7 @@ export function createApp({ complete, grantKey, appToken = '', models }: AppOpti
         const resumeText = text(body.resumeText, LIMITS.resume);
         if (!skills.length) return send(res, 400, { error: 'missing_skills', message: 'Add the job’s skills first (Jobs → the job → Make checklist).' }, origin);
         if (!resumeText) return send(res, 400, { error: 'missing_resume', message: 'Add the candidate’s resume first.' }, origin);
+        if (!allowed('plan')) return;
         const user = planUser({
           title: text(body.title, LIMITS.title) || 'Untitled job',
           company: text(body.company, LIMITS.title),
@@ -145,6 +169,7 @@ export function createApp({ complete, grantKey, appToken = '', models }: AppOpti
         const pdfBase64 = typeof body.pdfBase64 === 'string' ? body.pdfBase64 : '';
         if (!pdfBase64) return send(res, 400, { error: 'missing_file', message: 'We didn’t receive a file. Please choose the PDF again.' }, origin);
         if (base64Bytes(pdfBase64) > MAX_PDF_BYTES) return send(res, 413, { error: 'too_large', message: 'That PDF is over 8 MB. Try a smaller file, or paste the resume text instead.' }, origin);
+        if (!allowed('resume')) return;
         let reply: string;
         try {
           reply = await complete({ model: models.fast, system: RESUME_SYSTEM, user: resumeContent(pdfBase64), maxTokens: 6000 });
@@ -160,6 +185,7 @@ export function createApp({ complete, grantKey, appToken = '', models }: AppOpti
 
       if (req.method === 'POST' && url.pathname === '/api/transcribe-token') {
         if (!grantKey) return send(res, 503, { error: 'not_configured', message: 'Live transcription isn’t set up on the server yet.' }, origin);
+        if (!allowed('transcribe-token')) return;
         // Speech errors get speech wording (not the AI's), and the cause goes to the server log.
         let grant;
         try {
@@ -178,4 +204,19 @@ export function createApp({ complete, grantKey, appToken = '', models }: AppOpti
       return send(res, 502, { error: 'ai_error', message }, origin);
     }
   });
+
+  // Forget idle clients once a minute.
+  const sweeper = setInterval(() => limits.sweep(), 60_000);
+  sweeper.unref();
+  server.on('close', () => clearInterval(sweeper));
+  return server;
+}
+
+// Who is calling, for per-client limits: the socket's address, or behind a proxy the first X-Forwarded-For.
+export function clientOf(req: http.IncomingMessage, trustProxy: boolean): string {
+  if (trustProxy) {
+    const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+    if (forwarded) return forwarded;
+  }
+  return req.socket.remoteAddress || 'unknown';
 }

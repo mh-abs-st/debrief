@@ -77,6 +77,8 @@ Everything is TypeScript. The server and the tests run the `.ts` files directly 
 All `/api` routes need `Authorization: Bearer <DEBRIEF_APP_TOKEN>`. Without a configured token, the API refuses everything. CORS allows only `chrome-extension://` origins.
 
 - `GET /health`: no auth, returns `{ ok: true }`.
+- `GET /api/usage`: counts per day for the last 7 days (calls per route, speech keys, refusals; never content) and the limits in force.
+- Limits (`server/lib/limits.ts`, set in `.env`): per client a minute, 30 AI calls, 6 speech keys and 10 wrong-token tries; per day for everyone, 2,000 AI calls and 500 speech keys. Over a limit: `429` with `Retry-After` and a plain `message`. Set `TRUST_PROXY=1` behind a host's proxy.
 - `POST /api/skills`: `{ jobDescription }` → `{ skills: [{ name, why }] }`.
 - `POST /api/plan`: `{ title, company, description, skills, resumeText }` → `{ plan: { opening, skills: [{ name, resumeShows, askAbout, questions }], verify: [{ claim, question }] } }`. Any score or label the model adds is dropped.
 - `POST /api/followups`: `{ skill, question, answer }` → `{ questions }` (at most two).

@@ -25,17 +25,19 @@ export interface StartOptions {
   appToken?: string;
   models: AppOptions['models'];
   grantKey?: AppOptions['grantKey'];
+  limits?: AppOptions['limits'];
+  trustProxy?: boolean;
 }
 
 // Starts the app with a fake AI. Returns its base URL, the calls it made to the AI, post() and close().
-export async function start({ reply = '{}', fail = null, appToken = TOKEN, models, grantKey }: StartOptions) {
+export async function start({ reply = '{}', fail = null, appToken = TOKEN, models, grantKey, limits, trustProxy }: StartOptions) {
   const calls: CompleteArgs[] = [];
   const complete = async (args: CompleteArgs): Promise<string> => {
     calls.push(args);
     if (fail) throw fail;
     return typeof reply === 'function' ? reply(args) : reply;
   };
-  const { base, close } = await listen(createApp({ complete, grantKey, appToken, models }));
+  const { base, close } = await listen(createApp({ complete, grantKey, appToken, models, limits, trustProxy }));
   const post = (path: string, body: unknown, headers: Record<string, string> = auth) =>
     fetch(`${base}${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
   return { base, calls, post, close };
