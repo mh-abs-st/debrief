@@ -10,6 +10,7 @@ export interface Settings {
   language: string;
   theme: Theme;
   retentionDays: number;
+  includeMic: boolean; // mix in the interviewer's microphone and label lines You and Them
 }
 
 export const SETTINGS_DEFAULTS: Settings = {
@@ -18,6 +19,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   language: 'en',
   theme: 'system',
   retentionDays: 90,
+  includeMic: false,
 };
 
 const DATA_KEY = 'debriefData';
