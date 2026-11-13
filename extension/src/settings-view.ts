@@ -2,6 +2,8 @@
 // backing up and restoring, and deleting everything.
 import { $, el, toast, openSheet, confirmSheet, closestTarget, formatDate, actionShortcut, type Nav } from './ui.ts';
 import { howToInvoke } from './call-tab.ts';
+import { candidateNotice } from './notice.ts';
+import { copy } from './interview-view.ts';
 import { getSettings, saveSettings, deleteAll, getState, commit, type Theme } from './data.ts';
 import * as S from './store.ts';
 import { listeningCandidate, stoppedNote } from './interview-view.ts';
@@ -20,6 +22,8 @@ export function initSettings(nav: Nav): void {
   });
   $('setDeleteAll').addEventListener('click', removeEverything);
   $('setBackup').addEventListener('click', downloadBackup);
+  for (const id of ['setCompany', 'setContact', 'setRetention']) $(id).addEventListener('input', previewNotice);
+  $('setCopyNotice').addEventListener('click', () => copy(noticeFromForm().written, 'Notice copied. Paste it into the invite.'));
   input('setRestoreFile').addEventListener('change', restoreBackup);
   $('setDemo').addEventListener('click', () => {
     sheet().close();
@@ -33,6 +37,9 @@ function open() {
   input('setToken').value = s.appToken;
   select('setLanguage').value = s.language;
   select('setRetention').value = String(s.retentionDays);
+  input('setCompany').value = s.companyName;
+  input('setContact').value = s.privacyContact;
+  previewNotice();
   markTheme(s.theme);
   openSheet('settingsSheet');
   void actionShortcut().then((shortcut) => ($('setHowInvoke').textContent = howToInvoke(shortcut)));
@@ -55,6 +62,8 @@ async function save() {
     appToken: input('setToken').value.trim(),
     language: select('setLanguage').value,
     retentionDays: Number(select('setRetention').value) || 0,
+    companyName: input('setCompany').value.trim().slice(0, 120),
+    privacyContact: input('setContact').value.trim().slice(0, 200),
     theme,
   });
   applyTheme(theme);
@@ -140,4 +149,19 @@ async function restoreBackup() {
     read.skipped ? `${read.skipped} damaged ${read.skipped === 1 ? 'entry' : 'entries'} skipped.` : '',
   ];
   toast(notes.filter(Boolean).join(' ') + stoppedNote(listened));
+}
+
+// ---------- Candidate notice ----------
+
+// The notice as the form stands, so the preview follows what's typed before Save.
+function noticeFromForm() {
+  return candidateNotice({
+    company: input('setCompany').value,
+    contact: input('setContact').value,
+    retentionDays: Number(select('setRetention').value) || 0,
+  });
+}
+
+function previewNotice() {
+  $('setNoticePreview').textContent = noticeFromForm().written;
 }

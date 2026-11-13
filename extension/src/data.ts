@@ -11,6 +11,8 @@ export interface Settings {
   theme: Theme;
   retentionDays: number;
   includeMic: boolean; // mix in the interviewer's microphone and label lines You and Them
+  companyName: string; // for the candidate notice
+  privacyContact: string; // for the candidate notice: who candidates ask about their data
 }
 
 export const SETTINGS_DEFAULTS: Settings = {
@@ -20,6 +22,8 @@ export const SETTINGS_DEFAULTS: Settings = {
   theme: 'system',
   retentionDays: 90,
   includeMic: false,
+  companyName: '',
+  privacyContact: '',
 };
 
 const DATA_KEY = 'debriefData';
